@@ -18,6 +18,8 @@ Diese Version ist für die Chrome-Erweiterung **User JavaScript and CSS** vorber
 Beim Klick auf einen Weg in Overpass Turbo werden die Tags angezeigt.  
 Wenn du anschließend mit der Maus auf einen einzelnen Tag gehst, blendet das Skript eine **kindgerechte Erklärung** ein.
 
+![OSM Kinder-Erklärer Beispiel](kinder-erklaerer-beispiel.png)
+
 ## Beschreibung
 
 Dieses Skript erweitert **Overpass Turbo** um kindgerechte Erklärungen für OSM-Tags.
