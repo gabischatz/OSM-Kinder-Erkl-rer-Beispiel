@@ -1,491 +1,30 @@
+// ==UserScript==
+// @name         OSM Kinder-Erklärer PRO (v4.5c)
+// @namespace    http://tampermonkey.net/
+// @version      4.5c
+// @description  Kindgerechte Erklärungen für OSM-Tags inkl. datengetriebener Verkehrszeichen
+// @author       Lutz Müller
+// @match        https://overpass-turbo.eu/*
+// @grant        none
+// @run-at       document-end
+// ==/UserScript==
+
 (function () {
     "use strict";
 
-    const VERSION = "4.4";
+    // ═══════════════════════════════════════════════════════════════
+    // 🖼️  SVG-Schild Basis-URL (aus der JSON-Datei)
+    // ═══════════════════════════════════════════════════════════════
 
-    const TRAFFIC_SIGN_BESCHREIBUNGEN = {
-        "DE:101": "🚫 **Verbot für Fahrzeuge aller Art** – Hier darf kein Auto, Motorrad oder Fahrrad fahren!",
-        "DE:102": "🚫❄️ **Verbot für Schneefahrzeuge**",
-        "DE:105": "🚫🚗 **Verbot für Autos**",
-        "DE:106": "🚫🚛 **Verbot für LKW**",
-        "DE:110": "🚫🚲 **Verbot für Fahrräder**",
-        "DE:112": "🚫🚜 **Verbot für Traktoren**",
-        "DE:120": "🚫🐴 **Verbot für Reiter**",
-        "DE:125": "🚫🚶 **Verbot für Fußgänger**",
-        "DE:136": "🚫➡️ **Verbot für Rechtsabbieger**",
-        "DE:138": "🚫↪️ **Verbot für Wendende**",
-        "DE:140": "🚫⏩ **Verbot für Überholen**",
-        "DE:142": "🚫⏩🚛 **Verbot für LKW-Überholen**",
-        "DE:150": "🚫🔊 **Verbot von Hupen**",
-        "DE:201": "🚫➡️ **Keine Einfahrt** – Hier darf man nicht reinfahren!",
-        "DE:205": "🛑 **Stoppschild** – Hier musst du anhalten!",
-        "DE:206": "➡️ **Vorfahrtstraße** – Du hast Vorfahrt!",
-        "DE:208": "↪️ **Vorfahrt gewähren** – Du musst warten!",
-        "DE:209": "➡️ **Vorfahrt an der nächsten Kreuzung**",
-        "DE:214": "⬅️➡️ **Gegenverkehr hat Vorfahrt**",
-        "DE:215": "⬅️➡️ **Vorfahrt vor Gegenverkehr**",
-        "DE:220": "🚌 **Einbahnstraße**",
-        "DE:222": "🔄 **Kreisverkehr**",
-        "DE:224": "🚶 **Fußgängerüberweg (Zebrastreifen)**",
-        "DE:240": "🚶🚲 **Gemeinsamer Geh- und Radweg**",
-        "DE:241": "🚶│🚲 **Getrennter Geh- und Radweg**",
-        "DE:244": "🚲🏆 **Fahrradstraße**",
-        "DE:250": "🚫 **Verbot für Fahrzeuge aller Art**",
-        "DE:253": "🚗💨 **Autobahn**",
-        "DE:255": "🛣️ **Kraftfahrstraße** – Nur für Autos, keine Fahrräder oder Fußgänger!",
-        "DE:283": "🚫🅿️ **Absolutes Halteverbot**",
-        "DE:286": "🚫🅿️ **Eingeschränktes Halteverbot**",
-        "DE:290": "🅿️ **Parkplatz**",
-        "DE:291": "🅿️🚗 **Parkhaus / Tiefgarage**",
-        "DE:292": "🅿️🚲 **Fahrradparkplatz**",
-        "DE:293": "🅿️🚌 **Busparkplatz**",
-        "DE:294": "🅿️🚛 **LKW-Parkplatz**",
-        "DE:295": "🅿️🚐 **Wohnmobilparkplatz**",
-        "DE:297": "🅿️💰 **Gebührenpflichtiger Parkplatz**",
-        "DE:298": "🅿️⏱️ **Parkplatz mit Parkscheibe**",
-        "DE:299": "🅿️♿ **Behindertenparkplatz**",
-        "DE:301": "⬆️ **Geradeaus**",
-        "DE:303": "⬅️ **Links**",
-        "DE:305": "➡️ **Rechts**",
-        "DE:311": "🔄 **Kreisverkehr (Richtung)**",
-        "DE:314": "🚶 **Fußgängerzone**",
-        "DE:315": "🚲 **Fahrradzone**",
-        "DE:316": "🚶🚲 **Fuß- und Fahrradzone**",
-        "DE:317": "🧒 **Spielstraße**",
-        "DE:318": "🚗🐢 **Verkehrsberuhigter Bereich**",
-        "DE:321": "🏞️ **Touristische Hinweistafel**",
-        "DE:322": "🏛️ **Sehenswürdigkeit**",
-        "DE:323": "🏰 **Burg / Schloss**",
-        "DE:324": "🌲 **Naturdenkmal**",
-        "DE:325": "🏊 **Freibad**",
-        "DE:326": "⛪ **Kirche**",
-        "DE:327": "🏥 **Krankenhaus**",
-        "DE:328": "🚒 **Feuerwehr**",
-        "DE:329": "🚓 **Polizei**",
-        "DE:330": "🚌 **Bus**",
-        "DE:331": "🚆 **Bahn**",
-        "DE:332": "✈️ **Flugplatz**",
-        "DE:333": "⛴️ **Fähre**",
-        "DE:334": "🚲 **Radweg**",
-        "DE:335": "🚶 **Fußweg**",
-        "DE:336": "🐴 **Reitweg**",
-        "DE:337": "🚜 **Wirtschaftsweg**"
-    };
+    const SVG_BASE = "https://gabischatz.de.cool/img/stvo/";
 
-    const ERKLAERUNGEN = {
-        highway: {
-            motorway:        { emoji: "🚗💨", text: "Die Autobahn! Nur für schnelle Autos. Fahrräder und Fußgänger dürfen hier nicht lang." },
-            motorway_link:   { emoji: "↪️🚗", text: "Eine Auffahrt oder Abfahrt von der Autobahn." },
-            trunk:           { emoji: "🚗⚡", text: "Eine sehr große Schnellstraße. Fast wie eine kleine Autobahn." },
-            trunk_link:      { emoji: "↪️⚡", text: "Eine Auffahrt oder Abfahrt zu einer Schnellstraße." },
-            primary:         { emoji: "🔴", text: "Eine große wichtige Straße mit vielen Autos." },
-            primary_link:    { emoji: "↪️🔴", text: "Eine kurze Verbindungsstraße zu einer großen Hauptstraße." },
-            secondary:       { emoji: "🟠", text: "Eine mittelgroße Straße – weniger Autos als auf einer großen Hauptstraße." },
-            secondary_link:  { emoji: "↪️🟠", text: "Eine kurze Verbindungsstraße zu einer mittelgroßen Straße." },
-            tertiary:        { emoji: "🟡", text: "Eine kleinere Straße. Oft schon angenehmer für Fahrräder." },
-            tertiary_link:   { emoji: "↪️🟡", text: "Eine kurze Verbindungsstraße zu einer kleineren Straße." },
-            unclassified:    { emoji: "⬜", text: "Eine normale kleine Straße ohne besondere große Bedeutung." },
-            residential:     { emoji: "🏘️", text: "Eine Wohnstraße. Hier wohnen Menschen. Autos fahren meist langsamer." },
-            living_street:   { emoji: "🧒", text: "Eine Spielstraße! Autos fahren ganz langsam, Kinder dürfen auf der Straße spielen." },
-            pedestrian:      { emoji: "🚶", text: "Eine Fußgängerzone. Hier gehen Menschen zu Fuß, Autos dürfen meistens nicht hinein." },
-            service:         { emoji: "🔧", text: "Eine kleine Zufahrtsstraße, zum Beispiel zu Häusern, Höfen oder Parkplätzen." },
-            track:           { emoji: "🚜", text: "Ein Feld- oder Waldweg. Traktoren fahren hier oft, Fahrräder manchmal auch." },
-            path:            { emoji: "🌿", text: "Ein kleiner Weg in der Natur. Zum Spazierengehen und manchmal auch zum Radfahren." },
-            footway:         { emoji: "👟", text: "Ein Weg vor allem für Fußgänger." },
-            cycleway:        { emoji: "🚲", text: "Ein Fahrradweg! Hier können Fahrräder besonders gut fahren." },
-            bridleway:       { emoji: "🐴", text: "Ein Reitweg für Pferde." },
-            steps:           { emoji: "🪜", text: "Das sind Treppen. Mit dem Fahrrad muss man hier meistens schieben oder tragen." },
-            corridor:        { emoji: "🏢", text: "Ein Durchgang in einem Gebäude oder einer Anlage." },
-            busway:          { emoji: "🚌", text: "Eine Fahrbahn extra für Busse." },
-            road:            { emoji: "🛣️", text: "Eine Straße, deren genauer Typ noch nicht genauer beschrieben wurde." },
-            construction:    { emoji: "🚧", text: "Hier wird noch gebaut. Die Straße oder der Weg ist noch nicht fertig." }
-        },
-        lanes: {},
-        railway: {
-            rail:         { emoji: "🚆", text: "Eine normale Eisenbahnstrecke für große Züge." },
-            abandoned:    { emoji: "🛤️", text: "Stillgelegte Bahnstrecke – hier sind mal Züge gefahren, aber jetzt nicht mehr." },
-            razed:        { emoji: "🌱", text: "Bahnstrecke, bei der die Schienen weggebaut wurden. Jetzt wächst oft Gras dort." },
-            disused:      { emoji: "🧱", text: "Ungenutzte Bahnstrecke – die Schienen liegen noch da, aber kein Zug fährt mehr." },
-            light_rail:   { emoji: "🚋", text: "Stadtbahn – fährt oft in der Stadt oder Vorstadt, manchmal auf der Straße." },
-            tram:         { emoji: "🚃", text: "Eine Straßenbahn! Die fährt auf Schienen mitten in der Stadt." },
-            subway:       { emoji: "🚇", text: "Eine U-Bahn – die fährt tief unter der Erde durch die Stadt." },
-            narrow_gauge: { emoji: "🚂", text: "Eine Schmalspurbahn – die Schienen sind etwas enger als bei normalen Zügen." },
-            miniature:    { emoji: "🤏", text: "Eine Miniaturbahn mit ganz kleinen Zügen, oft im Park oder Zoo." },
-            preserved:    { emoji: "🏛️", text: "Eine Museumsbahn – hier fahren alte Züge, damit man sie anschauen kann!" },
-            funicular:    { emoji: "🚠", text: "Eine Standseilbahn – die fährt mit einem Seil an einem Berg hoch und runter." },
-            monorail:     { emoji: "🚝", text: "Eine Einschienenbahn – der Zug fährt auf einer einzelnen Schiene." }
-        },
-        cycleway: {
-            lane:          { emoji: "➖🚲", text: "Neben der Straße gibt es eine markierte Radspur." },
-            track:         { emoji: "🟦🚲", text: "Neben der Straße gibt es einen baulich getrennten Radweg." },
-            shared_lane:   { emoji: "🚲↔️", text: "Fahrräder teilen sich die Fahrspur mit anderen." },
-            share_busway:  { emoji: "🚲🚌", text: "Fahrräder teilen sich eine Spur mit Bussen." },
-            separate:      { emoji: "🛤️🚲", text: "Der Radweg ist separat eingezeichnet und verläuft getrennt." },
-            sidepath:      { emoji: "➡️🚲", text: "Es gibt einen Radweg daneben. Dieser soll benutzt werden." },
-            sidewalk:      { emoji: "🚲👟", text: "Fahrräder fahren auf einem Gehweg mit besonderer Erlaubnis." },
-            crossing:      { emoji: "🚲🚸", text: "Hier queren Fahrräder eine Straße oder einen anderen Weg." },
-            link:          { emoji: "🔗🚲", text: "Ein kurzes Verbindungsstück für den Radverkehr." },
-            asl:           { emoji: "🚲🟥", text: "Vor der Kreuzung gibt es einen Bereich, in dem Fahrräder vorne warten dürfen." },
-            opposite_lane: { emoji: "↩️🚲", text: "Radfahrer dürfen in Gegenrichtung auf einer markierten Spur fahren." },
-            opposite_track:{ emoji: "↩️🟦🚲", text: "Radfahrer dürfen in Gegenrichtung auf einem getrennten Radweg fahren." },
-            no:            { emoji: "➖🚲", text: "Keine besondere Fahrrad-Infrastruktur – Radfahrer fahren einfach mit im Straßenverkehr." }
-        },
-        "cycleway:both": {
-            no:            { emoji: "➖🚲", text: "Diese Straße hat auf beiden Seiten keine besondere Fahrrad-Infrastruktur." },
-            yes:           { emoji: "✅🚲", text: "Auf beiden Seiten ist die Straße für Radfahrer geeignet." },
-            designated:    { emoji: "🛣️🚲", text: "Auf beiden Seiten ist das Radfahren hier extra vorgesehen." },
-            shared_lane:   { emoji: "🟨🚲", text: "Autos und Fahrräder fahren auf beiden Seiten auf derselben Spur." },
-            shared_footway:{ emoji: "🚶‍♂️➡️🚲", text: "Auf beiden Seiten teilen sich Fahrrad und Fußgänger denselben Weg." },
-            lane:          { emoji: "➖🚲", text: "Auf beiden Seiten gibt es eine markierte Radspur." },
-            track:         { emoji: "🟦🚲", text: "Auf beiden Seiten gibt es einen getrennten Radweg." }
-        },
-        sidewalk: {
-            yes:      { emoji: "👟", text: "Hier gibt es einen Gehweg." },
-            no:       { emoji: "🚫👟", text: "Hier gibt es keinen Gehweg direkt an der Straße." },
-            both:     { emoji: "👟👟", text: "Auf beiden Seiten der Straße gibt es Gehwege." },
-            left:     { emoji: "⬅️👟", text: "Links neben der Straße gibt es einen Gehweg." },
-            right:    { emoji: "➡️👟", text: "Rechts neben der Straße gibt es einen Gehweg." },
-            separate: { emoji: "🛤️👟", text: "Der Gehweg ist separat eingezeichnet." }
-        },
-        crossing: {
-            yes:             { emoji: "🚸", text: "Hier kann man queren – also die Straße oder den Weg überqueren." },
-            uncontrolled:    { emoji: "🚸", text: "Eine Querungsstelle ohne Ampel." },
-            traffic_signals: { emoji: "🚦", text: "Hier gibt es eine Ampel zum Überqueren." },
-            zebra:           { emoji: "🦓", text: "Ein Zebrastreifen." },
-            marked:          { emoji: "🧾", text: "Die Querung ist sichtbar markiert." },
-            unmarked:        { emoji: "👀", text: "Hier wird gequert, aber ohne Bodenmarkierungen." },
-            island:          { emoji: "🏝️", text: "In der Mitte gibt es eine Schutzinsel." },
-            no:              { emoji: "🚫🚸", text: "Hier ist keine richtige Querungsstelle markiert." }
-        },
-        surface: {
-            asphalt:      { emoji: "⬛", text: "Glatter Asphalt – sehr angenehm zum Rollen." },
-            concrete:     { emoji: "🔲", text: "Harter Beton." },
-            paved:        { emoji: "✅", text: "Befestigt – also ein fester Belag." },
-            unpaved:      { emoji: "🟫", text: "Unbefestigt – eher natürlich und oft holpriger." },
-            paving_stones:{ emoji: "🧱", text: "Pflastersteine." },
-            sett:         { emoji: "🪨", text: "Grobes Steinpflaster." },
-            cobblestone:  { emoji: "🪨⚠️", text: "Kopfsteinpflaster – oft holprig." },
-            gravel:       { emoji: "🟡", text: "Kies mit vielen kleinen Steinen." },
-            fine_gravel:  { emoji: "⚪", text: "Feiner Kies – oft etwas angenehmer." },
-            compacted:    { emoji: "🟤", text: "Verdichteter Belag – festgedrückt." },
-            dirt:         { emoji: "💩", text: "Ein Erdweg – weich und manchmal matschig." },
-            earth:        { emoji: "🌍", text: "Natürlicher Erdboden." },
-            ground:       { emoji: "🟫", text: "Normaler natürlicher Boden." },
-            mud:          { emoji: "🟤💦", text: "Matschig – sehr weich und rutschig." },
-            grass:        { emoji: "🌿", text: "Gras." },
-            wood:         { emoji: "🪵", text: "Holz, zum Beispiel Bretter oder Bohlen." },
-            sand:         { emoji: "🏖️", text: "Sand – weich und anstrengend zum Fahren." },
-            rock:         { emoji: "⛰️", text: "Fels oder steiniger Untergrund." },
-            metal:        { emoji: "🔩", text: "Metall – zum Beispiel eine Metallbrücke." },
-            ice:          { emoji: "❄️", text: "Eis – sehr glatt!" },
-            snow:         { emoji: "☃️", text: "Schnee." },
-            clay:         { emoji: "🧴", text: "Lehmiger Boden, oft schmierig bei Nässe." }
-        },
-        smoothness: {
-            excellent:    { emoji: "✨", text: "Sehr glatt – wie neu." },
-            good:         { emoji: "👍", text: "Gut befahrbar." },
-            intermediate: { emoji: "🙂", text: "Geht noch ganz gut, aber nicht perfekt." },
-            bad:          { emoji: "😬", text: "Schon ziemlich holprig." },
-            very_bad:     { emoji: "😣", text: "Sehr holprig." },
-            horrible:     { emoji: "😵", text: "Ganz schön schlecht – nur für robuste Räder." },
-            very_horrible:{ emoji: "🤕", text: "Extrem schlecht." },
-            impassable:   { emoji: "⛔", text: "Kaum oder gar nicht passierbar." }
-        },
-        tracktype: {
-            grade1: { emoji: "1️⃣", text: "Sehr gut ausgebauter Feld- oder Waldweg, oft befestigt." },
-            grade2: { emoji: "2️⃣", text: "Noch recht guter Weg, aber schon etwas natürlicher." },
-            grade3: { emoji: "3️⃣", text: "Mittlerer Feld- oder Waldweg." },
-            grade4: { emoji: "4️⃣", text: "Ein eher schlechter, naturnaher Weg." },
-            grade5: { emoji: "5️⃣", text: "Ein sehr naturbelassener Weg, oft schwierig zu fahren." }
-        },
-        amenity: {
-            theatre:          { emoji: "🎭", text: "Ein Theater. Hier spielen Menschen Geschichten auf einer Bühne." },
-            cinema:           { emoji: "🎬", text: "Ein Kino. Hier schaut man Filme auf einer großen Leinwand." },
-            library:          { emoji: "📚", text: "Eine Bücherei. Hier kann man Bücher ausleihen und lesen." },
-            arts_centre:      { emoji: "🎨", text: "Ein Ort für Kunst, Musik oder andere schöne Dinge." },
-            community_centre: { emoji: "🏘️", text: "Ein Treffpunkt für Menschen aus dem Ort." },
-            school:           { emoji: "🏫", text: "Eine Schule. Hier lernen Kinder und Jugendliche." },
-            kindergarten:     { emoji: "🧒", text: "Ein Kindergarten. Hier spielen und lernen kleinere Kinder." },
-            university:       { emoji: "🎓", text: "Eine Hochschule. Hier lernen Erwachsene weiter." },
-            college:          { emoji: "🎓", text: "Eine Berufsschule oder Fachschule." },
-            hospital:         { emoji: "🏥", text: "Ein Krankenhaus. Hier werden kranke Menschen versorgt." },
-            clinic:           { emoji: "🏥", text: "Eine Klinik. Hier helfen Ärzte und Pflegekräfte." },
-            doctors:          { emoji: "🩺", text: "Eine Arztpraxis. Hier gehen Menschen hin, wenn sie Hilfe brauchen." },
-            dentist:          { emoji: "🦷", text: "Ein Zahnarzt. Hier werden die Zähne untersucht und behandelt." },
-            pharmacy:         { emoji: "💊", text: "Eine Apotheke. Hier bekommt man Medikamente." },
-            restaurant:       { emoji: "🍽️", text: "Ein Restaurant. Hier kann man essen." },
-            cafe:             { emoji: "☕", text: "Ein Café. Hier gibt es Getränke, Kuchen oder kleine Sachen zu essen." },
-            fast_food:        { emoji: "🍟", text: "Ein Imbiss. Hier gibt es schnelles Essen." },
-            ice_cream:        { emoji: "🍦", text: "Eine Eisdiele! Hier gibt es Eis in vielen Sorten." },
-            marketplace:      { emoji: "🧺", text: "Ein Markt oder Marktplatz. Hier verkaufen Menschen ihre Waren." },
-            post_office:      { emoji: "📮", text: "Eine Post. Hier kann man Briefe und Pakete verschicken." },
-            bank:             { emoji: "🏦", text: "Eine Bank. Hier geht es um Geld." },
-            atm:              { emoji: "💳", text: "Ein Geldautomat. Hier kann man Geld abheben." },
-            parking:          { emoji: "🅿️", text: "Ein Parkplatz. Hier können Autos oder Fahrräder abgestellt werden." },
-            bicycle_parking:  { emoji: "🚲🅿️", text: "Ein Fahrradstellplatz. Hier kann man das Fahrrad abstellen." },
-            fuel:             { emoji: "⛽", text: "Eine Tankstelle. Hier tanken Autos." },
-            charging_station: { emoji: "⚡🔌", text: "Eine Ladestation für Elektroautos oder E-Bikes." },
-            toilets:          { emoji: "🚻", text: "Öffentliche Toiletten." },
-            bench:            { emoji: "🪑", text: "Eine Bank zum Sitzen und Ausruhen." },
-            drinking_water:   { emoji: "💧", text: "Hier gibt es frisches Trinkwasser!" },
-            shelter:          { emoji: "🛖", text: "Ein Unterstand oder eine kleine Schutzhütte." },
-            waste_basket:     { emoji: "🗑️", text: "Ein Mülleimer." },
-            recycling:        { emoji: "♻️", text: "Ein Recyclinghof oder eine Sammelstelle. Hier bringt man alten Müll hin." },
-            fire_station:     { emoji: "🚒", text: "Eine Feuerwache. Hier warten die tapferen Feuerwehrleute!" },
-            police:           { emoji: "🚓", text: "Ein Polizeirevier oder eine Polizeiwache." },
-            townhall:         { emoji: "🏛️", text: "Das Rathaus. Hier arbeiten Menschen, die die Stadt verwalten." },
-            place_of_worship: { emoji: "🛐", text: "Eine Kirche, Moschee, Synagoge oder ein anderer Ort zum Beten." },
-            social_facility:  { emoji: "🤝", text: "Eine Sozialeinrichtung. Hier wird Menschen geholfen, die Unterstützung brauchen." }
-        },
-        tourism: {
-            museum:      { emoji: "🏛️", text: "Ein Museum. Hier kann man spannende Dinge anschauen und etwas lernen." },
-            gallery:     { emoji: "🖼️", text: "Eine Galerie. Hier hängt oder steht Kunst." },
-            attraction:  { emoji: "⭐", text: "Eine Sehenswürdigkeit. Das ist ein Ort, den viele interessant finden." },
-            artwork:     { emoji: "🗿", text: "Ein Kunstwerk im Freien oder an einem Platz." },
-            aquarium:    { emoji: "🐠", text: "Ein Aquarium. Hier gibt es Fische und andere Wassertiere zu sehen." },
-            zoo:         { emoji: "🦁", text: "Ein Zoo oder Tierpark. Hier kann man Tiere anschauen." },
-            viewpoint:   { emoji: "🔭", text: "Ein Aussichtspunkt. Von hier kann man weit schauen." },
-            information: { emoji: "ℹ️", text: "Eine Infostelle. Hier gibt es Hilfe oder Informationen." },
-            picnic_site: { emoji: "🧺", text: "Ein Platz zum Picknicken." },
-            hotel:       { emoji: "🏨", text: "Ein Hotel. Hier können Menschen übernachten." },
-            guest_house: { emoji: "🛏️", text: "Ein Gästehaus oder eine Pension zum Übernachten." },
-            camp_site:   { emoji: "⛺", text: "Ein Campingplatz. Hier kann man zelten!" },
-            theme_park:  { emoji: "🎡", text: "Ein Freizeitpark mit Fahrgeschäften und viel Spaß!" }
-        },
-        shop: {
-            supermarket:     { emoji: "🛒", text: "Ein Supermarkt. Hier kauft man viele Dinge für zu Hause." },
-            mall:            { emoji: "🏬", text: "Ein großes Einkaufszentrum mit vielen Läden." },
-            department_store:{ emoji: "🏢🛍️", text: "Ein Kaufhaus. Hier gibt es viele verschiedene Sachen." },
-            convenience:     { emoji: "🥤", text: "Ein kleiner Laden für Dinge, die man oft braucht." },
-            bakery:          { emoji: "🥨", text: "Eine Bäckerei. Hier gibt es Brot, Brötchen und Kuchen." },
-            butcher:         { emoji: "🥩", text: "Eine Fleischerei oder Metzgerei." },
-            clothes:         { emoji: "👕", text: "Ein Kleidungsgeschäft. Hier kauft man Sachen zum Anziehen." },
-            books:           { emoji: "📖", text: "Eine Buchhandlung. Hier gibt es Bücher." },
-            kiosk:           { emoji: "🗞️", text: "Ein kleiner Kiosk. Hier gibt es oft Zeitungen, Getränke oder Süßes." },
-            bicycle:         { emoji: "🚲", text: "Ein Fahrradladen. Hier gibt es Fahrräder oder Fahrradteile." },
-            toys:            { emoji: "🧸", text: "Ein Spielzeugladen!" },
-            electronics:     { emoji: "💻", text: "Ein Laden für Technik wie Computer, Kabel oder andere Geräte." },
-            florist:         { emoji: "🌷", text: "Ein Blumengeschäft." },
-            sports:          { emoji: "⚽", text: "Ein Sportgeschäft. Hier gibt es Sportkleidung und Sportgeräte." },
-            hairdresser:     { emoji: "✂️", text: "Ein Friseur. Hier werden die Haare geschnitten." },
-            optician:        { emoji: "👓", text: "Ein Optiker. Hier bekommt man Brillen." },
-            pet:             { emoji: "🐾", text: "Ein Tierhandlung oder Zoofachhandel. Hier gibt es alles für Tiere." },
-            music:           { emoji: "🎵", text: "Ein Musikladen. Hier gibt es Instrumente oder Musik-CDs." },
-            photo:           { emoji: "📷", text: "Ein Fotogeschäft. Hier werden Fotos entwickelt oder gedruckt." }
-        },
-        leisure: {
-            park:            { emoji: "🌳", text: "Ein Park. Hier kann man spazieren, spielen oder sich ausruhen." },
-            playground:      { emoji: "🛝", text: "Ein Spielplatz. Hier können Kinder spielen!" },
-            sports_centre:   { emoji: "🏟️", text: "Ein Sportzentrum. Hier machen Menschen Sport." },
-            stadium:         { emoji: "🏟️", text: "Ein Stadion. Hier schauen oder machen viele Menschen Sport." },
-            pitch:           { emoji: "⚽", text: "Ein Sportplatz, zum Beispiel für Fußball." },
-            swimming_pool:   { emoji: "🏊", text: "Ein Schwimmbad oder Becken zum Schwimmen." },
-            garden:          { emoji: "🌷", text: "Ein Garten mit Pflanzen und Blumen." },
-            fitness_centre:  { emoji: "🏋️", text: "Ein Fitnessstudio. Hier trainieren Menschen." },
-            fitness_station: { emoji: "🏋️🌳", text: "Ein kleiner Ort im Freien, an dem man Sport machen kann." },
-            marina:          { emoji: "⛵", text: "Ein Hafen für Boote." },
-            track:           { emoji: "🏃", text: "Eine Sport- oder Laufbahn." },
-            miniature_golf:  { emoji: "⛳", text: "Ein Minigolfplatz. Hier kann man Minigolf spielen!" },
-            ice_rink:        { emoji: "⛸️", text: "Eine Eisbahn. Hier kann man Schlittschuh laufen!" },
-            skate_park:      { emoji: "🛹", text: "Ein Skatepark. Hier fahren Leute Skateboard, Roller oder BMX!" },
-            dog_park:        { emoji: "🐕", text: "Ein Hundeauslaufgebiet. Hier dürfen Hunde frei laufen." },
-            slipway:         { emoji: "🚤", text: "Eine Bootsrampe, über die man Boote ins Wasser bringen kann." }
-        },
-        natural: {
-            tree:       { emoji: "🌳", text: "Ein einzelner Baum, der auf der Karte eingetragen ist." },
-            wood:       { emoji: "🌲", text: "Ein Wald aus Bäumen." },
-            water:      { emoji: "💧", text: "Wasser – ein See, ein Teich oder ein Fluss." },
-            wetland:    { emoji: "🦢", text: "Ein Feuchtgebiet wie ein Moor oder eine Sumpfwiese." },
-            scrub:      { emoji: "🌿", text: "Gebüsch oder Gestrüpp – dicht wachsende Sträucher." },
-            heath:      { emoji: "🟣", text: "Heideland – eine offene Landschaft oft mit Heide-Pflanzen." },
-            grassland:  { emoji: "🌾", text: "Eine Wiese oder Grasfläche." },
-            sand:       { emoji: "🏖️", text: "Ein Sandareal, zum Beispiel am Fluss oder See." },
-            mud:        { emoji: "🟤", text: "Schlammfläche, zum Beispiel am Ufer eines Gewässers." },
-            cliff:      { emoji: "🪨", text: "Ein steiler Felsen oder Abhang." },
-            peak:       { emoji: "⛰️", text: "Ein Berggipfel – der höchste Punkt eines Berges." },
-            spring:     { emoji: "💦", text: "Eine Quelle – hier kommt Wasser aus dem Boden!" },
-            cave_entrance: { emoji: "🕳️", text: "Ein Höhleneingang. Dahinter ist eine Höhle unter der Erde." },
-            beach:      { emoji: "🏖️", text: "Ein Strand – oft am Meer, See oder Fluss." },
-            coastline:  { emoji: "🌊", text: "Die Küstenlinie – hier treffen Land und Wasser zusammen." }
-        },
-        waterway: {
-            river:       { emoji: "🌊", text: "Ein Fluss. Das Wasser fließt von den Bergen ins Meer." },
-            stream:      { emoji: "🏞️", text: "Ein kleiner Bach. Oft plätschert er lustig vor sich hin!" },
-            canal:       { emoji: "🚢", text: "Ein Kanal – ein gerader, von Menschen gebauter Wasserweg." },
-            drain:       { emoji: "💧", text: "Ein Entwässerungsgraben." },
-            ditch:       { emoji: "🌧️", text: "Ein Graben, der Wasser ableitet." },
-            weir:        { emoji: "💦", text: "Ein Wehr – ein kleines Hindernis im Wasser, das den Wasserstand regelt." },
-            waterfall:   { emoji: "🌊⬇️", text: "Ein Wasserfall! Hier stürzt Wasser die Felsen hinunter." },
-            lock:        { emoji: "🚢🔒", text: "Eine Schleuse – damit können Boote von einem Wasserstand in den anderen wechseln." }
-        },
-        landuse: {
-            residential:   { emoji: "🏘️", text: "Ein Wohngebiet. Hier wohnen Menschen." },
-            commercial:    { emoji: "🏢", text: "Ein Gewerbegebiet. Hier gibt es Geschäfte und Büros." },
-            industrial:    { emoji: "🏭", text: "Ein Industriegebiet. Hier stehen Fabriken." },
-            retail:        { emoji: "🛍️", text: "Ein Einkaufsgebiet mit Läden." },
-            farmland:      { emoji: "🌾", text: "Ackerland. Hier wächst Getreide oder anderes Gemüse." },
-            farmyard:      { emoji: "🐄", text: "Ein Bauernhof. Hier leben oft Tiere." },
-            forest:        { emoji: "🌲", text: "Ein Wald – meistens mit vielen Bäumen bepflanzt." },
-            meadow:        { emoji: "🌿", text: "Eine Wiese – oft zum Heumachen oder für Tiere." },
-            grass:         { emoji: "🌱", text: "Eine Grasfläche." },
-            cemetery:      { emoji: "⛪", text: "Ein Friedhof. Hier werden verstorbene Menschen begraben." },
-            allotments:    { emoji: "🥕", text: "Kleingärten. Hier haben Familien ihren eigenen kleinen Garten!" },
-            construction:  { emoji: "🚧", text: "Eine Baustelle. Hier wird gerade etwas gebaut." },
-            military:      { emoji: "🪖", text: "Ein Militärgelände. Hier sind Soldaten stationiert." },
-            recreation_ground: { emoji: "⚽", text: "Ein Erholungsgebiet oder Sportgelände." }
-        },
-        building: {
-            yes:           { emoji: "🏠", text: "Hier steht ein Gebäude." },
-            house:         { emoji: "🏠", text: "Ein Wohnhaus für eine oder wenige Familien." },
-            apartments:    { emoji: "🏢", text: "Ein Mehrfamilienhaus mit vielen Wohnungen." },
-            residential:   { emoji: "🏘️", text: "Ein Gebäude, in dem Menschen wohnen." },
-            detached:      { emoji: "🏡", text: "Ein freistehendes Einfamilienhaus mit Garten drum herum." },
-            school:        { emoji: "🏫", text: "Ein Schulgebäude." },
-            university:    { emoji: "🎓", text: "Ein Universitätsgebäude." },
-            church:        { emoji: "⛪", text: "Eine Kirche." },
-            retail:        { emoji: "🛍️", text: "Ein Gebäude mit Läden im Erdgeschoss." },
-            commercial:    { emoji: "🏢", text: "Ein Büro- oder Geschäftsgebäude." },
-            industrial:    { emoji: "🏭", text: "Ein Fabrik- oder Lagergebäude." },
-            warehouse:     { emoji: "📦", text: "Ein Lagerhaus. Hier werden Waren aufbewahrt." },
-            hospital:      { emoji: "🏥", text: "Ein Krankenhausgebäude." },
-            hotel:         { emoji: "🏨", text: "Ein Hotelgebäude." },
-            garage:        { emoji: "🚗🏠", text: "Eine Garage für Autos." },
-            shed:          { emoji: "🛖", text: "Ein Schuppen. Hier lagert man Dinge." },
-            greenhouse:    { emoji: "🌱🏠", text: "Ein Gewächshaus. Hier werden Pflanzen gezogen." },
-            roof:          { emoji: "⛱️", text: "Ein überdachter Bereich ohne vollständige Wände." },
-            hut:           { emoji: "🛖", text: "Eine kleine Hütte." },
-            barn:          { emoji: "🏚️", text: "Eine Scheune auf einem Bauernhof." }
-        },
-        historic: {
-            castle:          { emoji: "🏰", text: "Eine Burg oder ein Schloss! Früher wohnten hier Könige oder Ritter." },
-            monument:        { emoji: "🗽", text: "Ein Denkmal – es erinnert an etwas Wichtiges oder jemanden Besonderen." },
-            memorial:        { emoji: "🕊️", text: "Eine Gedenkstätte oder ein Mahnmal." },
-            ruins:           { emoji: "🏚️", text: "Ruinen – das sind die Überreste eines alten, kaputten Gebäudes." },
-            church:          { emoji: "⛪", text: "Eine historische Kirche." },
-            city_gate:       { emoji: "🚪", text: "Ein altes Stadttor. Früher schützte es die Stadt." },
-            wayside_cross:   { emoji: "✝️", text: "Ein Wegkreuz – oft an Straßen oder Wegen als Erinnerung aufgestellt." },
-            wayside_shrine:  { emoji: "⛩️", text: "Ein kleiner Schrein oder eine Kapelle am Wegesrand." },
-            archaeological_site: { emoji: "🪣", text: "Eine archäologische Fundstelle – hier haben Forscher alte Dinge ausgegraben." },
-            manor:           { emoji: "🏛️", text: "Ein Herrenhaus – früher das Haus eines reichen Gutsbesitzers." },
-            fort:            { emoji: "🏰", text: "Ein Fort oder eine Festung – ein altes Verteidigungsbauwerk." },
-            boundary_stone:  { emoji: "🪨", text: "Ein Grenzstein – er zeigt an, wo früher eine Grenze war." }
-        },
-        public_transport: {
-            stop_position:  { emoji: "🚏", text: "Die genaue Stelle, wo ein Bus oder eine Bahn anhält." },
-            platform:       { emoji: "🚏🟦", text: "Ein Bahnsteig oder eine Bussteig – hier wartet man auf die Bahn oder den Bus." },
-            station:        { emoji: "🚉", text: "Ein Bahnhof oder eine größere Haltestelle." },
-            stop_area:      { emoji: "🚌🟡", text: "Das gesamte Gebiet rund um eine Haltestelle." }
-        },
-        barrier: {
-            fence:        { emoji: "🚧", text: "Ein Zaun." },
-            wall:         { emoji: "🧱", text: "Eine Mauer." },
-            gate:         { emoji: "🚪", text: "Ein Tor – man kann es öffnen, um durchzugehen." },
-            bollard:      { emoji: "🪣", text: "Ein Poller – ein kurzer Pfosten, der Autos aufhält, aber Fahrräder durchlässt." },
-            lift_gate:    { emoji: "🚧", text: "Eine Schranke – sie geht hoch, wenn man durchfahren darf." },
-            cycle_barrier:{ emoji: "🚲🚧", text: "Eine Fahrradsperre – sie hält Motorräder auf, aber Fahrräder kommen durch." },
-            stile:        { emoji: "🪜", text: "Ein Überstieg, zum Beispiel eine Treppe über einen Zaun für Fußgänger." },
-            kissing_gate: { emoji: "🚶🔁", text: "Ein Drehtörchen – man kann hindurch, aber Tiere bleiben draußen." },
-            hedge:        { emoji: "🌿🧱", text: "Eine Hecke – ein Zaun aus Pflanzen." }
-        },
-        access: {
-            yes:          { emoji: "✅", text: "Hier darf man entlanggehen oder entlangfahren." },
-            no:           { emoji: "🚫", text: "Hier darf man nicht einfach hinein." },
-            private:      { emoji: "🔒", text: "Das ist privat. Hier darf man nur mit Erlaubnis hin." },
-            permissive:   { emoji: "🙂", text: "Hier darf man gerade hin, weil es erlaubt wird. Das kann sich aber ändern." },
-            destination:  { emoji: "🎯", text: "Hier darf man hin, wenn man genau dort ein Ziel hat." },
-            customers:    { emoji: "🛒", text: "Hier dürfen nur Kunden hin." },
-            delivery:     { emoji: "📦", text: "Hier dürfen nur Fahrzeuge oder Menschen hin, die etwas liefern." },
-            agricultural: { emoji: "🚜", text: "Hier ist es vor allem für die Landwirtschaft gedacht." },
-            forestry:     { emoji: "🌲", text: "Hier ist es vor allem für Waldarbeit gedacht." },
-            designated:   { emoji: "🎯", text: "Dieser Weg ist extra für eine bestimmte Art von Verkehr gedacht." }
-        },
-        bicycle: {
-            designated:  { emoji: "🚲🎯", text: "Ein richtiger Fahrradweg. Hier ist Radfahren extra vorgesehen." },
-            lane:        { emoji: "➖🚲", text: "Ein Radstreifen auf der Straße. Er gehört zu den Fahrrädern." },
-            track:       { emoji: "🟦🚲", text: "Ein besonders geschützter Radweg. Das ist oft sicherer." },
-            separate:    { emoji: "🛤️🚲", text: "Ein eigener Radweg, getrennt von der Straße." },
-            shared_lane: { emoji: "🚲↔️", text: "Fahrräder teilen sich die Spur mit anderen Fahrzeugen." },
-            yes:         { emoji: "✅🚲", text: "Hier darf man Fahrrad fahren." },
-            no:          { emoji: "🚫🚲", text: "Hier darf man nicht Fahrrad fahren." },
-            dismount:    { emoji: "🚲⬇️", text: "Hier muss man absteigen und das Fahrrad schieben." },
-            permissive:  { emoji: "🙂🚲", text: "Radfahren ist hier gerade erlaubt, aber das ist nicht für immer sicher." },
-            use_sidepath:{ emoji: "➡️🚲", text: "Fahrräder sollen den Radweg daneben benutzen." },
-            discouraged: { emoji: "⚠️🚲", text: "Radfahren ist hier nicht verboten, aber eher keine gute Idee." }
-        },
-        foot: {
-            yes:         { emoji: "✅👟", text: "Zu Fuß gehen ist hier erlaubt." },
-            no:          { emoji: "🚫👟", text: "Zu Fuß gehen ist hier nicht erlaubt." },
-            designated:  { emoji: "👟🎯", text: "Dieser Weg ist extra für Menschen zu Fuß gedacht." },
-            permissive:  { emoji: "🙂👟", text: "Zu Fuß gehen ist hier gerade erlaubt, aber das kann sich ändern." },
-            use_sidepath:{ emoji: "➡️👟", text: "Fußgänger sollen den Gehweg daneben benutzen." }
-        },
-        segregated: {
-            yes: { emoji: "🚶│🚲", text: "Fußgänger und Fahrräder sind hier getrennt – jeder hat seinen eigenen Bereich." },
-            no:  { emoji: "🚶🚲", text: "Fußgänger und Fahrräder teilen sich hier dieselbe Fläche." }
-        },
-        oneway: {
-            yes:         { emoji: "➡️", text: "Eine Einbahnstraße – Fahrzeuge dürfen nur in eine Richtung fahren." },
-            no:          { emoji: "↔️", text: "Man darf in beide Richtungen fahren." },
-            "-1":        { emoji: "⬅️", text: "Die Einbahnstraße gilt genau andersherum als die gezeichnete Richtung." },
-            alternating: { emoji: "↕️", text: "Die Fahrtrichtung wechselt manchmal." }
-        },
-        "oneway:bicycle": {
-            no:  { emoji: "🔄🚲", text: "Gute Nachricht! Fahrräder dürfen in beide Richtungen fahren, auch wenn Autos nur eine Richtung dürfen!" },
-            yes: { emoji: "➡️🚲", text: "Auch Fahrräder dürfen nur in eine Richtung fahren." }
-        },
-        bridge: { yes: { emoji: "🌉", text: "Das ist eine Brücke!" } },
-        tunnel: { yes: { emoji: "🚇", text: "Das ist ein Tunnel – unter der Erde oder unter etwas anderem hindurch." } },
-        lit: {
-            yes: { emoji: "💡", text: "Hier gibt es Licht oder Straßenlaternen." },
-            no:  { emoji: "🌑", text: "Hier ist es nachts eher dunkel." }
-        },
-        service: {
-            driveway:         { emoji: "🏠🚗", text: "Eine Einfahrt zu einem Haus oder Hof." },
-            parking_aisle:    { emoji: "🅿️", text: "Ein Weg zwischen Parkplätzen." },
-            alley:            { emoji: "🏙️", text: "Eine enge Gasse." },
-            spur:             { emoji: "🌾", text: "Ein kleiner Stichweg, oft zu einem einzelnen Ziel." },
-            emergency_access: { emoji: "🚑", text: "Ein Weg, der besonders für Rettungsfahrzeuge wichtig sein kann." }
-        },
-        destination:           { template: (wert) => `🪧 Das Wegweiser-Schild zeigt: Hier geht es nach **${wert}**.` },
-        "destination:forward": { template: (wert) => `➡️🪧 In Fahrtrichtung zeigt das Schild nach **${wert}**.` },
-        "destination:backward":{ template: (wert) => `⬅️🪧 In Gegenrichtung zeigt das Schild nach **${wert}**.` },
-        "destination:ref":     { template: (wert) => `🔢🪧 Das Schild zeigt die Straßennummer **${wert}**.` },
-        maxspeed: {
-            none: { emoji: "💨🔥", text: "Keine allgemeine Geschwindigkeitsbegrenzung." },
-            walk: { emoji: "🚶", text: "Schrittgeschwindigkeit." },
-            "5":  { emoji: "🐢", text: "5 km/h – ganz langsam." },
-            "20": { emoji: "🐢", text: "20 km/h – langsam." },
-            "30": { emoji: "🚗💨", text: "30 km/h – eine typische Tempo-30-Zone." },
-            "50": { emoji: "🚗💨💨", text: "50 km/h – normale Stadtgeschwindigkeit." },
-            "100":{ emoji: "🛣️", text: "100 km/h – Landstraßen-Tempo." }
-        },
-        source: {
-            template: (wert) => {
-                const quellen = {
-                    survey:           "📋 **Vermessung vor Ort** – Jemand war hier und hat sich alles genau angeschaut.",
-                    gps:              "📡 **GPS-Messung** – Mit einem GPS-Gerät aufgezeichnet.",
-                    "aerial imagery": "🛰️ **Luftbild** – Von oben fotografiert.",
-                    bing:             "🛰️ **Bing-Luftbild** – Von Microsofts Luftbildern abgezeichnet.",
-                    opendata:         "📊 **Offene Daten** – Von Behörden oder anderen offenen Datenquellen.",
-                    "de:alkis":       "🏢 **Amtliches Kataster** – Offizielle Vermessungsdaten aus Deutschland."
-                };
-                const normalisiert = wert.toLowerCase();
-                for (const [key, text] of Object.entries(quellen)) {
-                    if (normalisiert.includes(key)) return text;
-                }
-                return `📌 **Woher kommt diese Information?** "${wert}". Das ist die Quelle der Daten.`;
-            }
-        },
-        "access:lanes":   { template: (wert) => `🛣️ **Verschiedene Fahrspuren haben verschiedene Regeln!** ${wert}.` },
-        "hgv:lanes":      { template: (wert) => `🚛 **LKW-Regeln pro Fahrspur:** ${wert}.` },
-        "psv:lanes":      { template: (wert) => `🚌 **Bus-Spuren!** ${wert}.` },
-        "maxspeed:lanes": { template: (wert) => `🚗💨 **Verschiedene Tempolimits pro Spur:** ${wert}.` },
-        "turn:lanes":     { template: (wert) => `🔄 **Abbiegespuren!** ${wert}.` },
-        "hov:lanes":      { template: (wert) => `👨‍👩‍👧‍👦 **Mehr-Personen-Spur:** ${wert}.` }
-    };
+    const VERSION = "4.5c";
 
-    function escapeHtml(text) {
-        return String(text)
+    // Aus verkehrszeichen_0.5.1.json kompakt eingebettet
+    const TRAFFIC_SIGN_INDEX = {"DE:36a DDR":{"de":"Vorfahrt der strassenbahn beachten ddr","severity":"info","image":"https://gabischatz.de.cool/img/stvo/36a.vorfahrt_der_strassenbahn_beachten.ddr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101":{"de":"Gefahrstelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101.gefahrstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-10":{"de":"Flugbetrieb aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-10.flugbetrieb.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-11":{"de":"Fussgaengerueberweg","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-11.fussgaengerueberweg.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-12":{"de":"Viehtrieb","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-12.viehtrieb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-13":{"de":"Reiter","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-13.reiter.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-14":{"de":"Amphibienwanderung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-14.amphibienwanderung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-15":{"de":"Steinschlag","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-15.steinschlag.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-20":{"de":"Flugbetrieb aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-20.flugbetrieb.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-21":{"de":"Fussgaengerueberweg aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-21.fussgaengerueberweg.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-22":{"de":"Viehtrieb aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-22.viehtrieb.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-23":{"de":"Reiter aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-23.reiter.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-24":{"de":"Amphibienwanderung aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-24.amphibienwanderung.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-25":{"de":"Steinschlag aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-25.steinschlag.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-51":{"de":"Schnee- oder eisglaette","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-51.schnee-_oder_eisglaette.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-52":{"de":"Splitt schotter","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-52.splitt.schotter.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-53":{"de":"Ufer","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-53.ufer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-54":{"de":"Unzureichendes lichtraumprofil","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-54.unzureichendes_lichtraumprofil.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:101-55":{"de":"Bewegliche bruecke","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/101-55.bewegliche_bruecke.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:102":{"de":"Kreuzung oder einmuendung mit vorfahrt von rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/102.kreuzung_oder_einmuendung_mit_vorfahrt_von_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:103-10":{"de":"Kurve links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/103-10.kurve_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:103-20":{"de":"Kurve rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/103-20.kurve_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:105-10":{"de":"Doppelkurve zunaechst links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/105-10.doppelkurve_zunaechst_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:105-20":{"de":"Doppelkurve zunaechst rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/105-20.doppelkurve_zunaechst_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-10":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-10.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-11":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-11.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-12":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-12.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-13":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-13.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-14":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-14.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-15":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-15.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-16":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-16.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-17":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-17.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-18":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-18.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-19":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-19.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-20":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-20.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-21":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-21.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-22":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-22.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-23":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-23.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-24":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-24.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-25":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-25.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-4":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-4.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-5":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-5.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-6":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-6.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-7":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-7.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-8":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-8.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:108-9":{"de":"Gefaelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/108-9.gefaelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-10":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-10.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-11":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-11.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-12":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-12.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-13":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-13.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-14":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-14.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-15":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-15.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-16":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-16.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-17":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-17.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-18":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-18.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-19":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-19.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-20":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-20.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-21":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-21.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-22":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-22.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-23":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-23.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-24":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-24.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-25":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-25.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-4":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-4.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-5":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-5.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-58":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-58.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-6":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-6.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-7":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-7.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-8":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-8.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:110-9":{"de":"Steigung","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/110-9.steigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:112":{"de":"Unebene fahrbahn","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/112.unebene_fahrbahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:114":{"de":"Schleuder- oder rutschgefahr","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/114.schleuder-_oder_rutschgefahr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:117-10":{"de":"Seitenwind von rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/117-10.seitenwind_von_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:117-20":{"de":"Seitenwind von links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/117-20.seitenwind_von_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:120":{"de":"Verengte fahrbahn","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/120.verengte_fahrbahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:121-10":{"de":"Einseitig rechts verengte fahrbahn","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/121-10.einseitig_rechts_verengte_fahrbahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:121-20":{"de":"Einseitig links verengte fahrbahn","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/121-20.einseitig_links_verengte_fahrbahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:123":{"de":"Arbeitsstelle","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/123.arbeitsstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:124":{"de":"Stau","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/124.stau.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:125":{"de":"Gegenverkehr","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/125.gegenverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:130 DDR":{"de":"Andreaskreuz","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/130.andreaskreuz_mit_blinklicht_fuer_unbeschrankten_mehrgleisigen_bahnuebergang.ddr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:131":{"de":"Lichtzeichenanlage","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/131.lichtzeichenanlage.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:133-10":{"de":"Fussgaenger aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/133-10.fussgaenger_aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:133-20":{"de":"Fussgaenger aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/133-20.fussgaenger.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:136-10":{"de":"Kinder aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/136-10.kinder.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:136-20":{"de":"Kinder aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/136-20.kinder.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:138-10":{"de":"Radverkehr","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/138-10.radverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:138-20":{"de":"Radverkehr aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/138-20.radverkehr.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:142-10":{"de":"Wildwechsel aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/142-10.wildwechsel.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:142-20":{"de":"Wildwechsel aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/142-20.wildwechsel.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:145-16":{"de":"Steinschlag-rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/145-16-steinschlag-rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:151":{"de":"Bahnuebergang","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/151.bahnuebergang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:156-10":{"de":"Bahnuebergang mit dreistreifiger bake","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/156-10.bahnuebergang_mit_dreistreifiger_bake.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:156-11":{"de":"Bahnuebergang mit dreistreifiger bake mit entfernungsangabe aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/156-11.bahnuebergang_mit_dreistreifiger_bake.mit_entfernungsangabe.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:156-20":{"de":"Bahnuebergang mit dreistreifiger bake aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/156-20.bahnuebergang_mit_dreistreifiger_bake.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:156-21":{"de":"Bahnuebergang mit dreistreifiger bake mit entfernungsangabe aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/156-21.bahnuebergang_mit_dreistreifiger_bake.mit_entfernungsangabe.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:157-10":{"de":"Dreistreifige bake rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/157-10.dreistreifige_bake_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:157-11":{"de":"Dreistreifige bake aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/157-11.dreistreifige_bake_aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:157-20":{"de":"Dreistreifige bake links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/157-20.dreistreifige_bake_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:157-21":{"de":"Dreistreifige bake mit entfernungsangabe aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/157-21.dreistreifige_bake_mit_entfernungsangabe.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:159-10":{"de":"Zweistreifige bake aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/159-10.zweistreifige_bake_aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:159-11":{"de":"Zweistreifige bake mit entfernungsangabe aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/159-11.zweistreifige_bake_mit_entfernungsangabe_aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:159-20":{"de":"Zweistreifige bake aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/159-20.zweistreifige_bake_aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:159-21":{"de":"Zweistreifige bake mit entfernungsangabe aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/159-21.zweistreifige_bake_mit_entfernungsangabe_aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:162-10":{"de":"Einstreifige bake aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/162-10.einstreifige_bake_aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:162-11":{"de":"Einstreifige bake mit entfernungsangabe aufstellung rechts","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/162-11.einstreifige_bake_mit_entfernungsangabe_aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:162-20":{"de":"Einstreifige bake aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/162-20.einstreifige_bake_aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:162-21":{"de":"Einstreifige bake mit entfernungsangabe aufstellung links","severity":"warn","image":"https://gabischatz.de.cool/img/stvo/162-21.einstreifige_bake_mit_entfernungsangabe_aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:201-50":{"de":"Andreaskreuz stehend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/201-50.andreaskreuz_stehend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:201-50-1":{"de":"Bo 1961","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/201-50-1.andreaskreuz_mit_blinklicht_fuer_unbeschrankte_oder_halbbeschrankte_bahnuebergaenge.bo_1961.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:201-50-2":{"de":"Bo 1961","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/201-50-2.andreaskreuz_mit_blinklicht_fuer_unbeschrankten_mehrgleisigen_bahnuebergang.bo_1961.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:201-51":{"de":"Andreaskreuz stehend mit Blitzpfeil","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/201-51.andreaskreuz_stehend_mit_blitzpfeil.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:201-52":{"de":"Andreaskreuz liegend 2013","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/201-52.andreaskreuz_liegend.2013.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:201-53":{"de":"Andreaskreuz mit blitzpfeil liegend 2013","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/201-53.andreaskreuz_mit_blitzpfeil_liegend.2013.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:205":{"de":"Vorfahrt gewaehren","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/205.vorfahrt_gewaehren.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:206":{"de":"Halt! vorfahrt gewaehren","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/206.halt!_vorfahrt_gewaehren.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:208":{"de":"Dem gegenverkehr vorrang gewaehren","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/208.dem_gegenverkehr_vorrang_gewaehren.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:209":{"de":"Vorgeschriebene fahrtrichtung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/209.vorgeschriebene_fahrtrichtung.rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:209-10":{"de":"Vorgeschriebene fahrtrichtung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/209-10.vorgeschriebene_fahrtrichtung.links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:209-30":{"de":"Vorgeschriebene fahrtrichtung geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/209-30.vorgeschriebene_fahrtrichtung.geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:211":{"de":"Vorgeschriebene fahrtrichtung hier rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/211.vorgeschriebene_fahrtrichtung.hier_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:211-10":{"de":"Vorgeschriebene fahrtrichtung hier links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/211-10.vorgeschriebene_fahrtrichtung.hier_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:214":{"de":"Vorgeschriebene fahrtrichtung geradeaus oder rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/214.vorgeschriebene_fahrtrichtung.geradeaus_oder_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:214-10":{"de":"Vorgeschriebene fahrtrichtung geradeaus oder links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/214-10.vorgeschriebene_fahrtrichtung.geradeaus_oder_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:214-30":{"de":"Vorgeschriebene fahrtrichtung rechts oder links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/214-30.vorgeschriebene_fahrtrichtung.rechts_oder_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:215":{"de":"Kreisverkehr","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/215.kreisverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:220-10":{"de":"Einbahnstrasse linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/220-10.einbahnstrasse.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:220-20":{"de":"Einbahnstrasse rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/220-20.einbahnstrasse.rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:222":{"de":"Vorgeschriebene vorbeifahrt rechts vorbei","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/222.vorgeschriebene_vorbeifahrt.rechts_vorbei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:222-10":{"de":"Vorgeschriebene vorbeifahrt links vorbei","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/222-10.vorgeschriebene_vorbeifahrt.links_vorbei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.1-50":{"de":"Seitenstreifen befahren 2 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.1-50.seitenstreifen_befahren.2_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.1-51":{"de":"Seitenstreifen befahrbar 3 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.1-51.seitenstreifen_befahrbar.3_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.1-52":{"de":"Seitenstreifen befahrbar 4 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.1-52.seitenstreifen_befahrbar.4_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.2-50":{"de":"Seitenstreifen nicht mehr befahren 2 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.2-50.seitenstreifen_nicht_mehr_befahren.2_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.2-51":{"de":"Seitenstreifen nicht mehr befahrbar 3 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.2-51.seitenstreifen_nicht_mehr_befahrbar.3_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.2-52":{"de":"Seitenstreifen nicht mehr befahren 4 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.2-52.seitenstreifen_nicht_mehr_befahren.4_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.3-50":{"de":"Seitenstreifen raeumen 2 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.3-50.seitenstreifen_raeumen.2_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.3-51":{"de":"Seitenstreifen raeumen 3 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.3-51.seitenstreifen_raeumen.3_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:223.3-52":{"de":"Seitenstreifen raeumen 4 fahrstreifen und seitenstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/223.3-52.seitenstreifen_raeumen.4_fahrstreifen_u._seitenstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:224":{"de":"Haltestelle","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/224.haltestelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:224-51":{"de":"Schulbushaltestelle mit zusatzzeichen 1042-36","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/224-51.schulbushaltestelle_mit_zusatzzeichen_1042-36.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:229":{"de":"Taxenstand","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/229.taxenstand.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:229-10":{"de":"Taxenstand anfang aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/229-10.taxenstand_anfang.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:229-11":{"de":"Taxenstand ende aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/229-11.taxenstand_ende.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:229-20":{"de":"Taxenstand ende aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/229-20.taxenstand_ende.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:229-21":{"de":"Taxenstand anfang aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/229-21.taxenstand_anfang.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:229-30":{"de":"Taxenstand mitte aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/229-30.taxenstand_mitte.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:229-31":{"de":"Taxenstand mitte aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/229-31.taxenstand_mitte.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:230":{"de":"Ladebereich","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/230.ladebereich.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:230-10":{"de":"Ladebereich anfang aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/230-10.ladebereich_anfang.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:230-11":{"de":"Ladebereich ende aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/230-11.ladebereich_ende.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:230-20":{"de":"Ladebereich ende aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/230-20.ladebereich_ende.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:230-21":{"de":"Ladebereich anfang aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/230-21.ladebereich_anfang.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:230-30":{"de":"Ladebereich mitte aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/230-30.ladebereich_mitte.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:230-31":{"de":"Ladebereich mitte aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/230-31.ladebereich_mitte.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:237":{"de":"Sonderweg radfahrer","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/237.sonderweg_radfahrer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:238":{"de":"Sonderweg reiter","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/238.sonderweg_reiter.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:239":{"de":"Sonderweg fussgaenger","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/239.sonderweg_fussgaenger.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:240":{"de":"Gemeinsamer fuss- und radweg","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/240.gemeinsamer_fuss-_und_radweg.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:241-30":{"de":"Getrennter rad- und fussweg","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/241-30.getrennter_rad-_und_fussweg.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:241-31":{"de":"Getrennter fuss- und radweg","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/241-31.getrennter_fuss-_und_radweg.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:242.1":{"de":"Beginn einer fussgaengerzone","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/242.1.beginn_einer_fussgaengerzone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:242.2":{"de":"Ende einer fussgaengerzone","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/242.2.ende_einer_fussgaengerzone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:244.1":{"de":"Beginn einer fahrradstrasse","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/244.1.beginn_einer_fahrradstrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:244.2":{"de":"Ende einer fahrradstrasse","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/244.2.ende_einer_fahrradstrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:245":{"de":"Bussonderfahrstreifen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/245.bussonderfahrstreifen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:250":{"de":"Verbot fuer fahrzeuge aller art","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/250.verbot_fuer_fahrzeuge_aller_art.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:250 & 1010-10":{"de":"Spielstrasse mit zusatzzeichen 1010-10","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/250.spielstrasse_mit_zusatzzeichen_1010-10.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:251":{"de":"Verbot fuer kraftwagen und sonstige mehrspurige kraftfahrzeuge","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/251.verbot_fuer_kraftwagen_und_sonstige_mehrspurige_kraftfahrzeuge.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:253":{"de":"Verbot fuer kraftfahrzeuge mit einem zulaessigen gesamtgewicht","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/253.verbot_fuer_kraftfahrzeuge_mit_einem_zulaessigen_gesamtgewicht.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:254":{"de":"Verbot fuer radfahrer","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/254.verbot_fuer_radfahrer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:255":{"de":"Verbot fuer kraftraeder auch mit beiwagen, kleinkraftraeder und mofas","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/255.verbot_fuer_kraftraeder.auch_mit_beiwagen,_kleinkraftraeder_und_mofas.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-50":{"de":"Verbot fuer mofas","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-50.verbot_fuer_mofas.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-51":{"de":"Verbot fuer reiter","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-51.verbot_fuer_reiter.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-52":{"de":"Verbot fuer gespannfuhrwerke","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-52.verbot_fuer_gespannfuhrwerke.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-53":{"de":"Verbot fuer viehtrieb","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-53.verbot_fuer_viehtrieb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-54":{"de":"Verbot fuer kraftomnibusse","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-54.verbot_fuer_kraftomnibusse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-55":{"de":"Verbot fuer personenkraftwagen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-55.verbot_fuer_personenkraftwagen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-56":{"de":"Verbot fuer personenkraftwagen mit anhaenger","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-56.verbot_fuer_personenkraftwagen_mit_anhaenger.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-57":{"de":"Verbot fuer lastkraftwagen mit anhaenger","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-57.verbot_fuer_lastkraftwagen_mit_anhaenger.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-58":{"de":"Verbot fuer kraftfahrzeuge und zuege die nicht schneller als 25 km-h fahren koennen oder duerfen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-58.verbot_fuer_kraftfahrzeuge_und_zuege.die_nicht_schneller_als_25_km-h_fahren_koennen_oder_duerfen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:257-59":{"de":"Verbot fuer elektrokleinstfahrzeuge im sinne der elektrokleinstfahrzeuge-verordnung ekfv","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/257-59.verbot_fuer_elektrokleinstfahrzeuge_im_sinne_der_elektrokleinstfahrzeuge-verordnung_ekfv.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:259":{"de":"Verbot fuer fussgaenger","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/259.verbot_fuer_fussgaenger.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:260":{"de":"Verbot fuer kraftraeder und mofas und sonstige mehrspurige kraftfahrzeuge","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/260.verbot_fuer_kraftraeder_und_mofas_und_sonstige_mehrspurige_kraftfahrzeuge.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:261":{"de":"Verbot fuer kennzeichnungspflichtige kraftfahrzeuge mit gefaehrlichen guetern","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/261.verbot_fuer_kennzeichnungspflichtige_kraftfahrzeuge_mit_gefaehrlichen_guetern.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:262-5,5":{"de":"Verbot fuer fahrzeuge ueber angegebene tatsaechliche masse","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/262-5,5.verbot_fuer_fahrzeuge_ueber_angegebene_tatsaechliche_masse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:263-8":{"de":"Verbot fuer fahrzeuge ueber angegebene tatsaechliche achslast","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/263-8.verbot_fuer_fahrzeuge_ueber_angegebene_tatsaechliche_achslast.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:264-2":{"de":"Verbot fuer fahrzeuge ueber angegebene tatsaechliche breite","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/264-2.verbot_fuer_fahrzeuge_ueber_angegebene_tatsaechliche_breite.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:264-2,3":{"de":"Verbot fuer fahrzeuge ueber angegebene tatsaechliche breite","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/264-2,3.verbot_fuer_fahrzeuge_ueber_angegebene_tatsaechliche_breite.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:265-3,8":{"de":"Verbot fuer fahrzeuge ueber angegebene tatsaechliche hoehe","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/265-3,8.verbot_fuer_fahrzeuge_ueber_angegebene_tatsaechliche_hoehe.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:266-10":{"de":"Verbot fuer fahrzeuge ueber angegebene tatsaechliche laenge","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/266-10.verbot_fuer_fahrzeuge_ueber_angegebene_tatsaechliche_laenge.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:267":{"de":"Verbot der einfahrt","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/267.verbot_der_einfahrt.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:268":{"de":"Schneeketten sind vorgeschrieben","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/268.schneeketten_sind_vorgeschrieben.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:269":{"de":"Verbot fuer fahrzeuge mit wassergefaehrdender ladung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/269.verbot_fuer_fahrzeuge_mit_wassergefaehrdender_ladung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:270.1":{"de":"Beginn eines verkehrsverbots zur verminderung schaedlicher luftverunreinigungen in einer zone i","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/270.1.beginn_eines_verkehrsverbots_zur_verminderung_schaedlicher_luftverunreinigungen_in_einer_zone._i.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:270.2":{"de":"Ende eines verkehrsverbots zur verminderung schaedlicher luftverunreinigungen in einer zone","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/270.2.ende_eines_verkehrsverbots_zur_verminderung_schaedlicher_luftverunreinigungen_in_einer_zone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:272":{"de":"Verbot des wendens","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/272.verbot_des_wendens.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:273-70":{"de":"Verbot des unterschreitens des angegebenen mindestabstandes","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/273-70.verbot_des_unterschreitens_des_angegebenen_mindestabstandes.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-10":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-10.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-100":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-100.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-110":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-110.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-120":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-120.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-130":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-130.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-20":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-20.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-30":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-30.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-40":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-40.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-5":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-5.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-50":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-50.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-60":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-60.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-70":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-70.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-80":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-80.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274-90":{"de":"Zulaessige hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274-90.zulaessige_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274.1":{"de":"Beginn einer tempo 30-zone","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274.1.beginn_einer_tempo_30-zone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274.1-20":{"de":"Beginn einer tempo 20-zone in verkehrsberuhigten geschaeftsbereichen einseitig","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274.1-20.beginn_einer_tempo_20-zone_in_verkehrsberuhigten_geschaeftsbereichen_einseitig.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274.2":{"de":"Ende einer tempo 30-zone einseitig","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274.2.ende_einer_tempo_30-zone_einseitig.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:274.2-20":{"de":"Ende einer tempo 20-zone in verkehrsberuhigten geschaeftsbereichen einseitig","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/274.2-20.ende_einer_tempo_20-zone_in_verkehrsberuhigten_geschaeftsbereichen_einseitig.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:275":{"de":"Vorgeschriebene mindestgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/275.vorgeschriebene_mindestgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:275-30":{"de":"Vorgeschriebene mindestgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/275-30.vorgeschriebene_mindestgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:276":{"de":"Ueberholverbot fuer kraftfahrzeuge aller art","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/276.ueberholverbot_fuer_kraftfahrzeuge_aller_art.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:277":{"de":"Ueberholverbot fuer kraftfahrzeuge mit einem zulaessigen gesamtgewicht ueber 2,8 t einschliesslich ihrer anhaenger","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/277.ueberholverbot_fuer_kraftfahrzeuge_mit_einem_zulaessigen_gesamtgewicht_ueber_2,8_t.einschliesslich_ihrer_anhaenger.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-10":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-10.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-100":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-100.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-110":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-110.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-120":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-120.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-130":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-130.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-20":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-20.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-30":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-30.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-40":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-40.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-5":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-5.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-50":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-50.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-60":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-60.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-70":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-70.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-80":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-80.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:278-90":{"de":"Ende der zulaessigen hoechstgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/278-90.ende_der_zulaessigen_hoechstgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:279-30":{"de":"Ende der vorgeschriebenen mindestgeschwindigkeit","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/279-30.ende_der_vorgeschriebenen_mindestgeschwindigkeit.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:280":{"de":"Ende des ueberholverbotes fuer kraftfahrzeuge aller art","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/280.ende_des_ueberholverbotes_fuer_kraftfahrzeuge_aller_art.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:281":{"de":"Ende des ueberholverbots fuer kraftfahrzeuge mit einem zulaessigen gesamtgewicht ueber 3,5 t","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/281.ende_des_ueberholverbots_fuer_kraftfahrzeuge_mit_einem_zulaessigen_gesamtgewicht_ueber_3,5_t.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:282":{"de":"Ende saemtlicher streckenverbote","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/282.ende_saemtlicher_streckenverbote.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:283":{"de":"Absolutes haltverbot","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/283.absolutes_haltverbot.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:283-10":{"de":"Absolutes haltverbot anfang aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/283-10.absolutes_haltverbot_anfang.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:283-11":{"de":"Absolutes haltverbot ende aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/283-11.absolutes_haltverbot_ende.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:283-20":{"de":"Absolutes haltverbot ende aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/283-20.absolutes_haltverbot_ende.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:283-21":{"de":"Absolutes haltverbot anfang aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/283-21.absolutes_haltverbot_anfang.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:283-30":{"de":"Absolutes haltverbot mitte aufstellung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/283-30.absolutes_haltverbot_mitte.aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:283-31":{"de":"Absolutes haltverbot mitte aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/283-31.absolutes_haltverbot_mitte.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:286":{"de":"Eingeschraenktes halteverbot","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/286.eingeschraenktes_halteverbot.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:286-10":{"de":"Eingeschraenktes halteverbot anfang rechtsaufstellung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/286-10.eingeschraenktes_halteverbot_anfang.rechtsaufstellung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:286-11":{"de":"Eingeschraenktes halteverbot ende aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/286-11.eingeschraenktes_halteverbot_ende.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:286-20":{"de":"Eingeschraenktes halteverbot ende rechtsaufstellung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/286-20.eingeschraenktes_halteverbot_ende.rechtsaufstellung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:286-21":{"de":"Eingeschraenktes halteverbot anfang aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/286-21.eingeschraenktes_halteverbot_anfang.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:286-30":{"de":"Eingeschraenktes halteverbot mitte rechtsaufstellung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/286-30.eingeschraenktes_halteverbot_mitte.rechtsaufstellung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:286-31":{"de":"Eingeschraenktes halteverbot mitte aufstellung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/286-31.eingeschraenktes_halteverbot_mitte.aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:290.1":{"de":"Beginn eines eingeschraenkten haltverbotes fuer eine zone","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/290.1.beginn_eines_eingeschraenkten_haltverbotes_fuer_eine_zone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:290.2":{"de":"Ende eines eingeschraenkten haltverbotes fuer eine zone","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/290.2.ende_eines_eingeschraenkten_haltverbotes_fuer_eine_zone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:297.1-21":{"de":"Vorankuendigungspfeil zur anzeige eines fahrstreifenendes","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/297.1-21.vorankuendigungspfeil_zur_anzeige_eines_fahrstreifenendes.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:301":{"de":"Vorfahrt","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/301.vorfahrt.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:306":{"de":"Vorfahrtstrasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/306.vorfahrtstrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:307":{"de":"Ende der vorfahrtstrasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/307.ende_der_vorfahrtstrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:308":{"de":"Vorrang vor dem gegenverkehr","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/308.vorrang_vor_dem_gegenverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314":{"de":"Parken","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314.parken.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314-10":{"de":"Parkplatz anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314-10.parkplatz_anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314-20":{"de":"Parkplatz ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314-20.parkplatz_ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314-30":{"de":"Parken mitte aufstellung rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314-30.parken_mitte_aufstellung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314-31":{"de":"Parken mitte aufstellung links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314-31.parken_mitte_aufstellung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314-50":{"de":"Parkhaus parkgarage","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314-50.parkhaus.parkgarage.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314.1":{"de":"Beginn einer parkraumbewirtschaftungszone","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314.1.beginn_einer_parkraumbewirtschaftungszone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:314.2":{"de":"Ende einer parkraumbewirtschaftungszone","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/314.2.ende_einer_parkraumbewirtschaftungszone.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-50":{"de":"Parken halb auf gehwegen in fahrtrichtung links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-50.parken_halb_auf_gehwegen_in_fahrtrichtung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-51":{"de":"Parken auf gehwegen halb in fahrtrichtung links anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-51.parken_auf_gehwegen_halb_in_fahrtrichtung_links.anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-52":{"de":"Parken auf gehwegen halb in fahrtrichtung links ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-52.parken_auf_gehwegen_halb_in_fahrtrichtung_links.ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-53":{"de":"Parken halb auf gehwegen in fahrtrichtung links mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-53.parken_halb_auf_gehwegen_in_fahrtrichtung_links_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-55":{"de":"Parken halb auf gehwegen in fahrtrichtung rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-55.parken_halb_auf_gehwegen_in_fahrtrichtung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-56":{"de":"Parken halb auf gehwegen in fahrtrichtung rechts anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-56.parken_halb_auf_gehwegen_in_fahrtrichtung_rechts_anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-57":{"de":"Parken halb auf gehwegen in fahrtrichtung rechts ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-57.parken_halb_auf_gehwegen_in_fahrtrichtung_rechts_ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-58":{"de":"Parken halb auf gehwegen in fahrtrichtung rechts mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-58.parken_halb_auf_gehwegen_in_fahrtrichtung_rechts_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-60":{"de":"Parken ganz auf gehwegen in fahrtrichtung links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-60.parken_ganz_auf_gehwegen_in_fahrtrichtung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-61":{"de":"Parken auf gehwegen ganz in fahrtrichtung links anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-61.parken_auf_gehwegen_ganz_in_fahrtrichtung_links.anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-62":{"de":"Parken auf gehwegen ganz in fahrtrichtung links ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-62.parken_auf_gehwegen_ganz_in_fahrtrichtung_links.ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-63":{"de":"Parken ganz auf gehwegen in fahrtrichtung links mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-63.parken_ganz_auf_gehwegen_in_fahrtrichtung_links_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-65":{"de":"Parken ganz auf gehwegen in fahrtrichtung rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-65.parken_ganz_auf_gehwegen_in_fahrtrichtung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-66":{"de":"Parken ganz auf gehwegen in fahrtrichtung rechts anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-66.parken_ganz_auf_gehwegen_in_fahrtrichtung_rechts_anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-67":{"de":"Parken ganz auf gehwegen in fahrtrichtung rechts ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-67.parken_ganz_auf_gehwegen_in_fahrtrichtung_rechts_ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-68":{"de":"Parken ganz auf gehwegen in fahrtrichtung rechts mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-68.parken_ganz_auf_gehwegen_in_fahrtrichtung_rechts_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-70":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-70.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-71":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung links anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-71.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_links_anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-72":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung links ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-72.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_links_ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-73":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung links mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-73.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_links_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-75":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-75.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-76":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung rechts anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-76.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_rechts_anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-77":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung rechts ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-77.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_rechts_ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-78":{"de":"Parken halb auf gehwegen quer zur fahrtrichtung rechts mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-78.parken_halb_auf_gehwegen_quer_zur_fahrtrichtung_rechts_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-80":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-80.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-81":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung links anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-81.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_links_anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-82":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung links ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-82.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_links_ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-83":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung links mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-83.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_links_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-85":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-85.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-86":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung rechts anfang","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-86.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_rechts_anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-87":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung rechts ende","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-87.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_rechts_ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:315-88":{"de":"Parken ganz auf gehwegen quer zur fahrtrichtung rechts mitte","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/315-88.parken_ganz_auf_gehwegen_quer_zur_fahrtrichtung_rechts_mitte.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:316":{"de":"Parken und reisen","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/316.parken_und_reisen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:316-50":{"de":"Parken und mitfahren","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/316-50.parken_und_mitfahren.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:317":{"de":"Wandererparkplatz","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/317.wandererparkplatz.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:318":{"de":"Parkscheibe","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/318.parkscheibe.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:325.1":{"de":"Beginn eines verkehrsberuhigten bereichs","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/325.1.beginn_eines_verkehrsberuhigten_bereichs.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:325.2":{"de":"Ende eines verkehrsberuhigten bereichs","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/325.2.ende_eines_verkehrsberuhigten_bereichs.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:327":{"de":"Tunnel","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/327.tunnel.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:327-50":{"de":"Tunnel mit laengenangabe in m","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/327-50.tunnel.mit_laengenangabe_in_m.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:327-51":{"de":"Tunnel mit laengenangabe in km","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/327-51.tunnel.mit_laengenangabe_in_km.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:328":{"de":"Nothalte- und pannenbucht","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/328.nothalte-_und_pannenbucht.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:330.1":{"de":"Autobahn","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/330.1.autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:330.2":{"de":"Ende der autobahn","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/330.2.ende_der_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:331.1":{"de":"Kraftfahrstrasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/331.1.kraftfahrstrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:331.2":{"de":"Ende der kraftfahrstrasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/331.2.ende_der_kraftfahrstrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:332":{"de":"Ausfahrt von der autobahn","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/332.ausfahrt_von_der_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:332.1":{"de":"Ausfahrttafel auf anderen strassen ausserhalb der autobahn","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/332.1.ausfahrttafel_auf_anderen_strassen_ausserhalb_der_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:332.1-20":{"de":"Ausfahrttafel auf anderen strassen ausserhalb der autobahn in weiss mit zielen nach zeichen 432","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/332.1-20.ausfahrttafel_auf_anderen_strassen_ausserhalb_der_autobahn.in_weiss_mit_zielen_nach_zeichen_432.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:333":{"de":"Pfeilschild ausfahrt von der autobahn","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/333.pfeilschild.ausfahrt_von_der_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:333.1":{"de":"Ausfahrt von anderen strassen ausserhalb der autobahn","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/333.1.ausfahrt_von_anderen_strassen_ausserhalb_der_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:333.1-20":{"de":"Ausfahrt von anderen strassen ausserhalb der autobahn in weiss in verbindung mit zeichen 332 1-20","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/333.1-20.ausfahrt_von_anderen_strassen_ausserhalb_der_autobahn.in_weiss_in_verbindung_mit_zeichen_332.1-20.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:334":{"de":"Ende der autobahn","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/334.ende_der_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:336":{"de":"Ende der kraftfahrstrasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/336.ende_der_kraftfahrstrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:350-10":{"de":"Fussgaengerueberweg rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/350-10.fussgaengerueberweg_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:350-20":{"de":"Fussgaengerueberweg linksaufstellung einseitig","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/350-20.fussgaengerueberweg_linksaufstellung_einseitig.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:350.1":{"de":"Radschnellweg","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/350.1.radschnellweg.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:354":{"de":"Wasserschutzgebiet","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/354.wasserschutzgebiet.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:356":{"de":"Verkehrshelfer","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/356.verkehrshelfer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:357":{"de":"Sackgasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/357.sackgasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:357-50":{"de":"Durchlaessige sackgasse fuer fussgaenger und radverkehr","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/357-50.durchlaessige_sackgasse_fuer_fussgaenger_und_radverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:357-51":{"de":"Sackgasse; fuer fussgaenger durchlaessige sackgasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/357-51.sackgasse;_fuer_fussgaenger_durchlaessige_sackgasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:357-52":{"de":"Sackgasse; fuer radverkehr durchlaessige sackgasse","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/357-52.sackgasse;_fuer_radverkehr_durchlaessige_sackgasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:358":{"de":"Erste hilfe","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/358.erste_hilfe.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:363":{"de":"Polizei","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/363.polizei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-50":{"de":"Fernsprecher","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-50.fernsprecher.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-51":{"de":"Notrufsaeule","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-51.notrufsaeule.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-52":{"de":"Tankstelle","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-52.tankstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-53":{"de":"Autogastankstelle","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-53.autogastankstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-54":{"de":"Erdgastankstelle","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-54.erdgastankstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-55":{"de":"Autobahnhotel","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-55.autobahnhotel.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-56":{"de":"Autobahngasthaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-56.autobahngasthaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-57":{"de":"Autobahnkiosk","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-57.autobahnkiosk.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-58":{"de":"Toilette","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-58.toilette.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-59":{"de":"Autobahnkapelle","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-59.autobahnkapelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-60":{"de":"Zelt- und wohnwagenplatz","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-60.zelt-_und_wohnwagenplatz.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-61":{"de":"Informationsstelle","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-61.informationsstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-62":{"de":"Pannenhilfe","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-62.pannenhilfe.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-63":{"de":"Fussgaengerunterfuehrung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-63.fussgaengerunterfuehrung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-64":{"de":"Fussgaengerueberfuehrung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-64.fussgaengerueberfuehrung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-65":{"de":"Ladestation fuer elektrofahrzeuge","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-65.ladestation_fuer_elektrofahrzeuge.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-66":{"de":"Wasserstofftankstelle","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-66.wasserstofftankstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-67":{"de":"Wohnmobilplatz","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-67.wohnmobilplatz.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:365-68":{"de":"Wohnmobil- und wohnwagenplatz","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/365-68.wohnmobil-_und_wohnwagenplatz.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:385":{"de":"Ortshinweistafel","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/385.ortshinweistafel.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1":{"de":"Touristischer hinweis","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1.touristischer_hinweis.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-10":{"de":"Touristischer hinweis als wegweiser wegweiser linksweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-10.touristischer_hinweis_als_wegweiser.wegweiser_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-11":{"de":"Touristischer hinweis als wegweiser vorwegweiser linksweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-11.touristischer_hinweis_als_wegweiser.vorwegweiser_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-12":{"de":"Touristischer hinweis als wegweiser pfeilwegweiser linksweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-12.touristischer_hinweis_als_wegweiser.pfeilwegweiser_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-20":{"de":"Touristischer hinweis als wegweiser wegweiser rechtsweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-20.touristischer_hinweis_als_wegweiser.wegweiser_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-21":{"de":"Touristischer hinweis als wegweiser vorwegweiser rechtsweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-21.touristischer_hinweis_als_wegweiser.vorwegweiser_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-22":{"de":"Touristischer hinweis als wegweiser pfeilwegweiser rechtsweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-22.touristischer_hinweis_als_wegweiser.pfeilwegweiser_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-30":{"de":"Touristischer hinweis als wegweiser vor- wegweiser geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-30.touristischer_hinweis_als_wegweiser.vor-_wegweiser_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-50":{"de":"Touristischer hinweis mit bezugsziel variante „in“","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-50.touristischer_hinweis_mit_bezugsziel.variante_„in“.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-51":{"de":"Touristischer hinweis mit bezugsziel variante „via“","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-51.touristischer_hinweis_mit_bezugsziel.variante_„via“.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-52":{"de":"Touristischer hinweis mit bezugsziel variante „richtung“","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-52.touristischer_hinweis_mit_bezugsziel.variante_„richtung“.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.1-53":{"de":"Touristischer hinweis fluss oder kanal","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.1-53.touristischer_hinweis_fluss_oder_kanal.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2":{"de":"Touristische unterrichtungstafel","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2.touristische_unterrichtungstafel.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-10":{"de":"Touristische route wegweiser linksweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-10.touristische_route.wegweiser_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-11":{"de":"Touristische route vorwegweiser linksweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-11.touristische_route.vorwegweiser_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-12":{"de":"Touristische route pfeilwegweiser linksweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-12.touristische_route.pfeilwegweiser_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-20":{"de":"Touristische route wegweiser rechtsweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-20.touristische_route.wegweiser_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-21":{"de":"Touristische route vorwegweiser rechtsweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-21.touristische_route.vorwegweiser_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-22":{"de":"Touristische route pfeilwegweiser rechtsweisend","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-22.touristische_route.pfeilwegweiser_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-30":{"de":"Touristische route vor- wegweiser geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-30.touristische_route.vor-_wegweiser_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-51":{"de":"Touristischer hinweis mit bezugsziel „via“","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-51.touristischer_hinweis_mit_bezugsziel_„via“.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-52":{"de":"Touristischer hinweis mit bezugsziel „richtung“","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-52.touristischer_hinweis_mit_bezugsziel_„richtung“.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.2-53":{"de":"Touristische route als hinweisschild","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.2-53.touristische_route_als_hinweisschild.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.3":{"de":"Touristische unterrichtungstafel","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.3.touristische_unterrichtungstafel.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:386.3-50":{"de":"Touristische unterrichtungstafel erinnerungstafel gemaess „brocken-erklaerung“","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/386.3-50.touristische_unterrichtungstafel.erinnerungstafel_gemaess_„brocken-erklaerung“.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:390":{"de":"Mautpflicht nach dem bundesfernstrassenmautgesetz","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/390.mautpflicht_nach_dem_bundesfernstrassenmautgesetz.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:390.2":{"de":"Ende der mautpflicht nach dem bundesfernstrassenmautgesetz","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/390.2.ende_der_mautpflicht_nach_dem_bundesfernstrassenmautgesetz.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:391":{"de":"Mautpflichtige strecke","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/391.mautpflichtige_strecke.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:392":{"de":"Zollstelle","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/392.zollstelle.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:393":{"de":"Informationstafel an grenzuebergangsstellen an anderen strassen","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/393.informationstafel_an_grenzuebergangsstellen_an_anderen_strassen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:401":{"de":"Bundesstrassennummer","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/401.bundesstrassennummer.svg","wikipedia":"https://de.wikipedia.org/wiki/Liste_der_Bundesstra%C3%9Fen_in_Deutschland","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:401 28a":{"de":"Bundesstrasse verbindet Reutlingen mit Tübingen.","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/401.bundesstrassennummer.a.svg","wikipedia":"https://de.wikipedia.org/wiki/Liste_der_Bundesstra%C3%9Fen_in_Deutschland","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:401 4R":{"de":"Bundesstrassennummer: Ringstraße, die vollständig innerhalb des Stadtgebiets von Nürnberg","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/401.bundesstrassennummer.r.svg","wikipedia":"https://de.wikipedia.org/wiki/Liste_der_Bundesstra%C3%9Fen_in_Deutschland","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:401 4f":{"de":"Bundesstrassennummer, geplante Verbindungsstraße von Anschlussstelle A3 zum Nürnberger Flughafen.","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/401.bundesstrassennummer.f.svg","wikipedia":"https://de.wikipedia.org/wiki/Liste_der_Bundesstra%C3%9Fen_in_Deutschland","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:401 71n":{"de":"Bundesstrassennummer, Ortsumgehung  Haldensleben, an die A14","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/401.bundesstrassennummer.n.svg","wikipedia":"https://de.wikipedia.org/wiki/Liste_der_Bundesstra%C3%9Fen_in_Deutschland","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:405":{"de":"Number der-autobahn","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/405.number_der-autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:406-50":{"de":"Knotenpunkte der autobahnen ein- oder zweistellige nummer","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/406-50.knotenpunkte_der_autobahnen_ein-_oder_zweistellige_nummer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:406-51":{"de":"Knotenpunkte der autobahnen drei oder mehrstellige nummer","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/406-51.knotenpunkte_der_autobahnen_drei_oder_mehrstellige_nummer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:410":{"de":"Europastrasse","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/410.europastrasse.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:415-10":{"de":"Wegweiser auf bundesstrassen linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/415-10.wegweiser_auf_bundesstrassen_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:415-20":{"de":"Wegweiser auf bundesstrassen rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/415-20.wegweiser_auf_bundesstrassen_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:418-10":{"de":"Wegweiser auf sonstigen strassen mit groesserer verkehrsbedeutung linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/418-10.wegweiser_auf_sonstigen_strassen_mit_groesserer_verkehrsbedeutung_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:418-20":{"de":"Wegweiser auf sonstigen strassen mit groesserer verkehrsbedeutung rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/418-20.wegweiser_auf_sonstigen_strassen_mit_groesserer_verkehrsbedeutung_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:419-10":{"de":"Pfeilwegweiser auf sonstigen strassen mit geringerer verkehrsbedeutung linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/419-10.pfeilwegweiser_auf_sonstigen_strassen_mit_geringerer_verkehrsbedeutung.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:419-20":{"de":"Pfeilwegweiser auf sonstigen strassen mit geringerer verkehrsbedeutung rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/419-20.pfeilwegweiser_auf_sonstigen_strassen_mit_geringerer_verkehrsbedeutung.rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:421-10":{"de":"Wegweiser fuer lastkraftwagen linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/421-10.wegweiser_fuer_lastkraftwagen_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:421-11":{"de":"Wegweiser fuer kennzeichnungspflichtige fahrzeuge linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/421-11.wegweiser_fuer_kennzeichnungspflichtige_fahrzeuge_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:421-12":{"de":"Wegweiser fuer fahrzeuge mit wassergefaehrdender ladung linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/421-12.wegweiser_fuer_fahrzeuge_mit_wassergefaehrdender_ladung_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:421-20":{"de":"Wegweiser fuer lastkraftwagen rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/421-20.wegweiser_fuer_lastkraftwagen_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:421-21":{"de":"Wegweiser fuer kennzeichnungspflichtige fahrzeuge rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/421-21.wegweiser_fuer_kennzeichnungspflichtige_fahrzeuge_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:421-22":{"de":"Wegweiser fuer fahrzeuge mit wassergefaehrdender ladung rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/421-22.wegweiser_fuer_fahrzeuge_mit_wassergefaehrdender_ladung_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-10":{"de":"Wegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ hier links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-10.wegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“.hier_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-11":{"de":"Wegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ links einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-11.wegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“.links_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-12":{"de":"Wegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ hier links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-12.wegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.hier_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-13":{"de":"Wegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ links einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-13.wegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.links_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-14":{"de":"Wegweiser fuer bestimmte verkehrsarten „fahrzeuge mit wassergefaehrdender ladung“ hier links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-14.wegweiser_fuer_bestimmte_verkehrsarten_„fahrzeuge_mit_wassergefaehrdender_ladung“.hier_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-15":{"de":"Wegweiser fuer bestimmte verkehrsarten „fahrzeuge mit wassergefaehrdender ladung“ links einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-15.wegweiser_fuer_bestimmte_verkehrsarten_„fahrzeuge_mit_wassergefaehrdender_ladung“.links_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-16":{"de":"Wegweiser fuer bestimmte verkehrsarten „radverkehr“ hier links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-16.wegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“.hier_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-17":{"de":"Wegweiser fuer bestimmte verkehrsarten „radverkehr“ links einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-17.wegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“.links_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-20":{"de":"Wegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ hier rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-20.wegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“.hier_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-21":{"de":"Wegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ rechts einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-21.wegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“.rechts_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-22":{"de":"Wegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ hier rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-22.wegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.hier_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-23":{"de":"Wegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ rechts einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-23.wegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.rechts_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-24":{"de":"Wegweiser fuer bestimmte verkehrsarten fahrzeuge mit wassergefaehrdender ladung hier rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-24.wegweiser_fuer_bestimmte_verkehrsarten__fahrzeuge_mit_wassergefaehrdender_ladung.hier_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-25":{"de":"Wegweiser fuer bestimmte verkehrsarten „fahrzeuge mit wassergefaehrdender ladung“ rechts einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-25.wegweiser_fuer_bestimmte_verkehrsarten_„fahrzeuge_mit_wassergefaehrdender_ladung“.rechts_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-26":{"de":"Wegweiser fuer bestimmte verkehrsarten „radverkehr“ hier rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-26.wegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“.hier_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-27":{"de":"Wegweiser fuer bestimmte verkehrsarten „radverkehr“ rechts einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-27.wegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“.rechts_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-30":{"de":"Wegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-30.wegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“.geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-31":{"de":"Wegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-31.wegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-34":{"de":"Wegweiser fuer bestimmte verkehrsarten „fahrzeuge mit wassergefaehrdender ladung“ geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-34.wegweiser_fuer_bestimmte_verkehrsarten_„fahrzeuge_mit_wassergefaehrdender_ladung“.geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:422-36":{"de":"Wegweiser fuer bestimmte verkehrsarten „radverkehr“ geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/422-36.wegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“.geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:430-10":{"de":"Wegweiser zur autobahn","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/430-10.wegweiser_zur_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:430-20":{"de":"Wegweiser zur autobahn","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/430-20.wegweiser_zur_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:432-10":{"de":"Wegweiser zu inneroertlichen zielen und zu einrichtungen mit erheblicher verkehrsbedeutung linksweisend nach rwb","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/432-10.wegweiser_zu_inneroertlichen_zielen_und_zu_einrichtungen_mit_erheblicher_verkehrsbedeutung_linksweisend.nach_rwb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:432-20":{"de":"Wegweiser zu inneroertlichen zielen und zu einrichtungen mit erheblicher verkehrsbedeutung rechtsweisend nach rwb","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/432-20.wegweiser_zu_inneroertlichen_zielen_und_zu_einrichtungen_mit_erheblicher_verkehrsbedeutung_rechtsweisend.nach_rwb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:434-50":{"de":"Tabellenwegweiser kompakte form nach rwb","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/434-50.tabellenwegweiser.kompakte_form_nach_rwb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:434-52":{"de":"Tabellenwegweiser aufgeloeste form nur innerorts mit bundesstrassennummer","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/434-52.tabellenwegweiser.aufgeloeste_form_nur_innerorts_mit_bundesstrassennummer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:434-53":{"de":"Tabellenwegweiser aufgeloeste form nur innerorts ohne bundesstrassennummer","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/434-53.tabellenwegweiser.aufgeloeste_form_nur_innerorts_ohne_bundesstrassennummer.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:437":{"de":"Strassennamensschild","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/437.strassennamensschild.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:438":{"de":"Vorwegweiser","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/438.vorwegweiser.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:439":{"de":"Vorwegweiser","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/439.vorwegweiser.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:440":{"de":"Vorwegweiser zur autobahn","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/440.vorwegweiser_zur_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:441":{"de":"Gegliederter vorwegweiser zur autobahn","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/441.gegliederter_vorwegweiser_zur_autobahn.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-10":{"de":"Vorwegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-10.vorwegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-11":{"de":"Vorwegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-11.vorwegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-12":{"de":"Wegweiser fuer bestimmte verkehrsarten „fahrzeuge mit wassergefaehrdender ladung“ linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-12.wegweiser_fuer_bestimmte_verkehrsarten_„fahrzeuge_mit_wassergefaehrdender_ladung“.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-13":{"de":"Wegweiser fuer bestimmte verkehrsarten „radverkehr“ linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-13.wegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-20":{"de":"Vorwegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ rechtsausweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-20.vorwegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“_rechtsausweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-21":{"de":"Vorwegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-21.vorwegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-22":{"de":"Vorwegweiser fuer bestimmte verkehrsarten „fahrzeuge mit wassergefaehrdender ladung“ rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-22.vorwegweiser_fuer_bestimmte_verkehrsarten_„fahrzeuge_mit_wassergefaehrdender_ladung“_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-23":{"de":"Vorwegweiser fuer bestimmte verkehrsarten „radverkehr“ rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-23.vorwegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-50":{"de":"Wegweiser fuer bestimmte verkehrsarten „kfz mit einer zulaessigen gesamtmasse ueber 3,5 t“ ohne pfeilsymbol","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-50.wegweiser_fuer_bestimmte_verkehrsarten_„kfz_mit_einer_zulaessigen_gesamtmasse_ueber_3,5_t“.ohne_pfeilsymbol.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-51":{"de":"Wegweiser fuer bestimmte verkehrsarten „kennzeichnungspflichtige fahrzeuge mit gefaehrlichen guetern“ ohne pfeilsymbol","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-51.wegweiser_fuer_bestimmte_verkehrsarten_„kennzeichnungspflichtige_fahrzeuge_mit_gefaehrlichen_guetern“.ohne_pfeilsymbol.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-52":{"de":"Vorwegweiser fuer bestimmte verkehrsarten „fahrzeuge mit wassergefaehrdender ladung“ ohne pfeilsymbol","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-52.vorwegweiser_fuer_bestimmte_verkehrsarten_„fahrzeuge_mit_wassergefaehrdender_ladung“.ohne_pfeilsymbol.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:442-53":{"de":"Wegweiser fuer bestimmte verkehrsarten „radverkehr“ ohne pfeilsymbol","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/442-53.wegweiser_fuer_bestimmte_verkehrsarten_„radverkehr“.ohne_pfeilsymbol.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:448":{"de":"Ankuendigungstafel auf autobahnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/448.ankuendigungstafel_auf_autobahnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:448-50":{"de":"Ankuendigungstafel auf anderen strassen ausserhalb von autobahnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/448-50.ankuendigungstafel_auf_anderen_strassen_ausserhalb_von_autobahnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:448.1":{"de":"Autohof","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/448.1.autohof.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:449":{"de":"Vorwegweiser auf autobahnen nach rwba","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/449.vorwegweiser_auf_autobahnen_nach_rwba.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:449-50":{"de":"Vorwegweiser auf anderen strassen ausserhalb von autobahnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/449-50.vorwegweiser_auf_anderen_strassen_ausserhalb_von_autobahnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:449.vorwegweiser_auf_autobahnen_rwba-1":{"de":"Vorwegweiser auf autobahnen rwba-1","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/449.vorwegweiser_auf_autobahnen_rwba-1.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:450-50":{"de":"Ankuendigungsbake einstreifig 100 m","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/450-50.ankuendigungsbake_einstreifig_100_m.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:450-51":{"de":"Ankuendigungsbake zweistreifig 200 m","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/450-51.ankuendigungsbake_zweistreifig_200_m.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:450-52":{"de":"Ankuendigungsbake dreistreifig 300 m","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/450-52.ankuendigungsbake_dreistreifig_300_m.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:450-53":{"de":"Ankuendigungsbake einstreifig 100 m gelb","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/450-53.ankuendigungsbake_einstreifig_100_m.gelb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:450-54":{"de":"Ankuendigungsbake zweistreifig 200 m gelb","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/450-54.ankuendigungsbake_zweistreifig_200_m.gelb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:450-55":{"de":"Ankuendigungsbake dreistreifig 300 m gelb","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/450-55.ankuendigungsbake_dreistreifig_300_m.gelb.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:453":{"de":"Entfernungstafel auf autobahnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/453.entfernungstafel_auf_autobahnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:453-50":{"de":"Entfernungstafel auf autobahnaehnlich ausgebauten zweibahnigen strassen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/453-50.entfernungstafel_auf_autobahnaehnlich_ausgebauten.zweibahnigen_strassen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:454-10":{"de":"Umleitungswegweiser linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/454-10.umleitungswegweiser_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:454-20":{"de":"Umleitungswegweiser rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/454-20.umleitungswegweiser_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-10":{"de":"Ankuendigung oder fortsetzung der umleitung vorankuendigung links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-10.ankuendigung_oder_fortsetzung_der_umleitung.vorankuendigung_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-11":{"de":"Ankuendigung oder fortsetzung der umleitung hier links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-11.ankuendigung_oder_fortsetzung_der_umleitung.hier_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-12":{"de":"Ankuendigung oder fortsetzung der umleitung links einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-12.ankuendigung_oder_fortsetzung_der_umleitung.links_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-20":{"de":"Ankuendigung oder fortsetzung der umleitung vorankuendigung rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-20.ankuendigung_oder_fortsetzung_der_umleitung.vorankuendigung_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-21":{"de":"Ankuendigung oder fortsetzung der umleitung hier rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-21.ankuendigung_oder_fortsetzung_der_umleitung.hier_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-22":{"de":"Ankuendigung oder fortsetzung der umleitung rechts einordnen","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-22.ankuendigung_oder_fortsetzung_der_umleitung.rechts_einordnen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-30":{"de":"Ankuendigung oder fortsetzung der umleitung vorankuendigung geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-30.ankuendigung_oder_fortsetzung_der_umleitung.vorankuendigung_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.1-50":{"de":"Ankuendigung oder fortsetzung der umleitung ohne pfeilsymbol","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.1-50.ankuendigung_oder_fortsetzung_der_umleitung.ohne_pfeilsymbol.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:455.2":{"de":"Ende der umleitung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/455.2.ende_der_umleitung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:457.1":{"de":"Umleitungsankuendigung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/457.1.umleitungsankuendigung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:457.2":{"de":"Ende der umleitung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/457.2.ende_der_umleitung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:458":{"de":"Planskizze","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/458.planskizze.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-10":{"de":"Bedarfsumleitung linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-10.bedarfsumleitung.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-11":{"de":"Bedarfsumleitung rechts vorbei","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-11.bedarfsumleitung.rechts_vorbei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-12":{"de":"Bedarfsumleitung hier links","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-12.bedarfsumleitung.hier_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-20":{"de":"Bedarfsumleitung rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-20.bedarfsumleitung.rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-21":{"de":"Bedarfsumleitung links vorbei","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-21.bedarfsumleitung.links_vorbei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-22":{"de":"Bedarfsumleitung hier rechts","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-22.bedarfsumleitung.hier_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-30":{"de":"Bedarfsumleitung geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-30.bedarfsumleitung_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:460-50":{"de":"Bedarfsumleitung ohne pfeilsysmbol","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/460-50.bedarfsumleitung.ohne_pfeilsysmbol.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:466":{"de":"Bedarfsumleitungstafel","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/466.bedarfsumleitungstafel.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:467.1-10":{"de":"Umlenkungspfeil streckenempfehlung linksweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/467.1-10.umlenkungspfeil_streckenempfehlung_linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:467.1-20":{"de":"Umlenkungspfeil streckenempfehlung rechtsweisend","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/467.1-20.umlenkungspfeil_streckenempfehlung_rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:467.1-30":{"de":"Umlenkungspfeil streckenempfehlung geradeaus","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/467.1-30.umlenkungspfeil_streckenempfehlung_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:467.2":{"de":"Umlenkungspfeil ende ende einer streckenempfehlung","severity":"regulate","image":"https://gabischatz.de.cool/img/stvo/467.2.umlenkungspfeil_ende_ende_einer_streckenempfehlung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-10":{"de":"Ueberleitungstafel darstellung ohne gegenverkehr","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-10.ueberleitungstafel.darstellung_ohne_gegenverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-11":{"de":"Ueberleitungstafel darstellung ohne gegenverkehr","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-11.ueberleitungstafel.darstellung_ohne_gegenverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-12":{"de":"Ueberleitungstafel; darstellung ohne gegenverkehr dreistreifig nach links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-12.ueberleitungstafel;_darstellung_ohne_gegenverkehr.dreistreifig_nach_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-13":{"de":"Ueberleitungstafel ohne gegenverkehr 2streifig links 1 uebergeleitet","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-13.ueberleitungstafel_ohne_gegenverkehr_2streifig_links_1_uebergeleitet.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-14":{"de":"Ueberleitungstafel ohne gegenverkehr 3streifig links 1 uebergeleitet","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-14.ueberleitungstafel_ohne_gegenverkehr_3streifig_links_1_uebergeleitet.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-15":{"de":"Ueberleitungstafel ohne gegenverkehr 3streifig links 2 uebergeleitet","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-15.ueberleitungstafel_ohne_gegenverkehr_3streifig_links_2_uebergeleitet.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-16":{"de":"Ueberleitungstafel ohne gegenverkehr 1streifig links 1streifig geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-16.ueberleitungstafel_ohne_gegenverkehr_1streifig_links_1streifig_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-17":{"de":"Ueberleitungstafel ohne gegenverkehr 1streifig links 2streifig geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-17.ueberleitungstafel_ohne_gegenverkehr_1streifig_links_2streifig_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-18":{"de":"Ueberleitungstafel ohne gegenverkehr 2streifig links 1streifig geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-18.ueberleitungstafel_ohne_gegenverkehr_2streifig_links_1streifig_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-20":{"de":"Ueberleitungstafel darstellung ohne gegenverkehr - einstreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-20.ueberleitungstafel.darstellung_ohne_gegenverkehr_-_einstreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-21":{"de":"Ueberleitungstafel; darstellung ohne gegenverkehr zweistreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-21.ueberleitungstafel;_darstellung_ohne_gegenverkehr.zweistreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-22":{"de":"Ueberleitungstafel; darstellung ohne gegenverkehr dreistreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-22.ueberleitungstafel;_darstellung_ohne_gegenverkehr.dreistreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-23":{"de":"Ueberleitungstafel ohne gegenverkehr 2streifig rechts 1 uebergeleitet","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-23.ueberleitungstafel_ohne_gegenverkehr_2streifig_rechts_1_uebergeleitet.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-24":{"de":"Ueberleitungstafel ohne gegenverkehr 3streifig rechts 1 uebergeleitet","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-24.ueberleitungstafel_ohne_gegenverkehr_3streifig_rechts_1_uebergeleitet.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-25":{"de":"Ueberleitungstafel ohne gegenverkehr 3streifig rechts 2 uebergeleitet","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-25.ueberleitungstafel_ohne_gegenverkehr_3streifig_rechts_2_uebergeleitet.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-26":{"de":"Ueberleitungstafel ohne gegenverkehr 1streifig rechts 1streifig geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-26.ueberleitungstafel_ohne_gegenverkehr_1streifig_rechts_1streifig_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-27":{"de":"Ueberleitungstafel ohne gegenverkehr 1streifig rechts 2streifig geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-27.ueberleitungstafel_ohne_gegenverkehr_1streifig_rechts_2streifig_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:501-28":{"de":"Ueberleitungstafel ohne gegenverkehr 2streifig rechts 1streifig geradeaus","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/501-28.ueberleitungstafel_ohne_gegenverkehr_2streifig_rechts_1streifig_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:505-11":{"de":"Ueberleitungstafel zeichen264 2streifig links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/505-11.ueberleitungstafel_zeichen264_2streifig_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:505-12":{"de":"Ueberleitungstafel zeichen264 3streifig links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/505-12.ueberleitungstafel_zeichen264_3streifig_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:505-21":{"de":"Ueberleitungstafel zeichen264 2streifig rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/505-21.ueberleitungstafel_zeichen264_2streifig_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:505-22":{"de":"Ueberleitungstafel zeichen264 3streifig rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/505-22.ueberleitungstafel_zeichen264_3streifig_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:511-10":{"de":"Verschwenkungstafel 1streifig links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/511-10.verschwenkungstafel_1streifig_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:511-11":{"de":"Verschwenkungstafel 2streifig links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/511-11.verschwenkungstafel_2streifig_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:511-12":{"de":"Verschwenkungstafel 3streifig links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/511-12.verschwenkungstafel_3streifig_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:511-20":{"de":"Verschwenkungstafel 1streifig rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/511-20.verschwenkungstafel_1streifig_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:511-21":{"de":"Verschwenkungstafel 2streifig rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/511-21.verschwenkungstafel_2streifig_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:511-22":{"de":"Verschwenkungstafel 3streifig rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/511-22.verschwenkungstafel_3streifig_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:513-10":{"de":"Verschwenkungstafel kurze verschwenkung ohne gegenverkehr einstreifig nach links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/513-10.verschwenkungstafel_kurze_verschwenkung.ohne_gegenverkehr.einstreifig_nach_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:513-11":{"de":"Verschwenkungstafel kurze verschwenkung ohne gegenverkehr zweistreifig nach links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/513-11.verschwenkungstafel_kurze_verschwenkung.ohne_gegenverkehr.zweistreifig_nach_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:513-20":{"de":"Verschwenkungstafel kurze verschwenkung ohne gegenverkehr einstreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/513-20.verschwenkungstafel_kurze_verschwenkung.ohne_gegenverkehr.einstreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:513-21":{"de":"Verschwenkungstafel kurze verschwenkung ohne gegenverkehr zweistreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/513-21.verschwenkungstafel_kurze_verschwenkung.ohne_gegenverkehr.zweistreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:514-10":{"de":"Verschwenkungstafel kurze verschwenkung mit gegenverkehr einstreifig nach links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/514-10.verschwenkungstafel_kurze_verschwenkung.mit_gegenverkehr.einstreifig_nach_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:514-20":{"de":"Verschwenkungstafel kurze verschwenkung mit gegenverkehr einstreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/514-20.verschwenkungstafel_kurze_verschwenkung.mit_gegenverkehr.einstreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:515-11":{"de":"Verschwenkungstafel ohne gegenverkehr mit integriertem zeichen 264 stvo zweistreifig nach links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/515-11.verschwenkungstafel.ohne_gegenverkehr_mit_integriertem_zeichen_264_stvo.zweistreifig_nach_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:515-12":{"de":"Verschwenkungstafel ohne gegenverkehr mit integriertem zeichen 264 stvo dreistreifig nach links","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/515-12.verschwenkungstafel.ohne_gegenverkehr_mit_integriertem_zeichen_264_stvo.dreistreifig_nach_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:515-21":{"de":"Verschwenkungstafel ohne gegenverkehr mit integriertem zeichen 264 stvo zweistreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/515-21.verschwenkungstafel.ohne_gegenverkehr_mit_integriertem_zeichen_264_stvo.zweistreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:515-22":{"de":"Verschwenkungstafel ohne gegenverkehr mit integriertem zeichen 264 stvo dreistreifig nach rechts","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/515-22.verschwenkungstafel.ohne_gegenverkehr_mit_integriertem_zeichen_264_stvo.dreistreifig_nach_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:521-30":{"de":"Fahrstreifentafel darstellung ohne gegenverkehr zwei fahrstreifen in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/521-30.fahrstreifentafel_darstellung_ohne_gegenverkehr.zwei_fahrstreifen_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:521-31":{"de":"Fahrstreifentafel darstellung ohne gegenverkehr drei fahrstreifen in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/521-31.fahrstreifentafel.darstellung_ohne_gegenverkehr.drei_fahrstreifen_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:521-32":{"de":"Fahrstreifentafel darstellung ohne gegenverkehr vier fahrstreifen in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/521-32.fahrstreifentafel.darstellung_ohne_gegenverkehr.vier_fahrstreifen_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:521-33":{"de":"Fahrstreifentafel darstellung ohne gegenverkehr fuenf fahrstreifen in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/521-33.fahrstreifentafel.darstellung_ohne_gegenverkehr.fuenf_fahrstreifen_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-30":{"de":"Fahrstreifentafel darstellung mit gegenverkehr ein fahrstreifen in fahrtrichtung ein fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-30.fahrstreifentafel.darstellung_mit_gegenverkehr.ein_fahrstreifen_in_fahrtrichtung.ein_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-31":{"de":"Fahrstreifentafel darstellung mit gegenverkehr zwei fahrstreifen in fahrtrichtung ein fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-31.fahrstreifentafel.darstellung_mit_gegenverkehr.zwei_fahrstreifen_in_fahrtrichtung.ein_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-32":{"de":"Fahrstreifentafel darstellung mit gegenverkehr ein fahrstreifen in fahrtrichtung zwei fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-32.fahrstreifentafel.darstellung_mit_gegenverkehr.ein_fahrstreifen_in_fahrtrichtung.zwei_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-33":{"de":"Fahrstreifentafel darstellung mit gegenverkehr zwei fahrstreifen in fahrtrichtung zwei fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-33.fahrstreifentafel.darstellung_mit_gegenverkehr.zwei_fahrstreifen_in_fahrtrichtung.zwei_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-34":{"de":"Fahrstreifentafel darstellung mit gegenverkehr drei fahrstreifen in fahrtrichtung zwei fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-34.fahrstreifentafel.darstellung_mit_gegenverkehr.drei_fahrstreifen_in_fahrtrichtung.zwei_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-35":{"de":"Fahrstreifentafel darstellung mit gegenverkehr zwei fahrstreifen in fahrtrichtung drei fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-35.fahrstreifentafel.darstellung_mit_gegenverkehr.zwei_fahrstreifen_in_fahrtrichtung.drei_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-36":{"de":"Fahrstreifentafel darstellung mit gegenverkehr drei fahrstreifen in fahrtrichtung drei fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-36.fahrstreifentafel.darstellung_mit_gegenverkehr.drei_fahrstreifen_in_fahrtrichtung.drei_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-37":{"de":"Fahrstreifentafel darstellung mit gegenverkehr drei fahrstreifen in fahrtrichtung ein fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-37.fahrstreifentafel.darstellung_mit_gegenverkehr.drei_fahrstreifen_in_fahrtrichtung.ein_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:522-38":{"de":"Fahrstreifentafel darstellung mit gegenverkehr ein fahrstreifen in fahrtrichtung drei fahrstreifen in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/522-38.fahrstreifentafel.darstellung_mit_gegenverkehr.ein_fahrstreifen_in_fahrtrichtung.drei_fahrstreifen_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:524-30":{"de":"Fahrstreifentafel ohne gegenverkehr mit integriertem zeichen 253 zweistreifig in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/524-30.fahrstreifentafel.ohne_gegenverkehr_mit_integriertem_zeichen_253.zweistreifig_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:524-31":{"de":"Fahrstreifentafel ohne gegenverkehr mit integriertem zeichen 253 dreistreifig in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/524-31.fahrstreifentafel.ohne_gegenverkehr_mit_integriertem_zeichen_253.dreistreifig_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:524-32":{"de":"Fahrstreifentafel ohne gegenverkehr mit integriertem zeichen 253 vierstreifig in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/524-32.fahrstreifentafel.ohne_gegenverkehr_mit_integriertem_zeichen_253.vierstreifig_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:524-33":{"de":"Fahrstreifentafel ohne gegenverkehr mit integriertem zeichen 253 fuenfstreifig in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/524-33.fahrstreifentafel.ohne_gegenverkehr_mit_integriertem_zeichen_253.fuenfstreifig_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:525-31":{"de":"Fahrstreifentafel ohne gegenverkehr mit integriertem zeichen 275 dreistreifig in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/525-31.fahrstreifentafel.ohne_gegenverkehr_mit_integriertem_zeichen_275.dreistreifig_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:526-31":{"de":"Fahrstreifentafel mit gegenverkehr und mit integriertem zeichen 275 zweistreifig in fahrtrichtung und einstreifig in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/526-31.fahrstreifentafel.mit_gegenverkehr_und_mit_integriertem_zeichen_275.zweistreifig_in_fahrtrichtung_und_einstreifig_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:526-33":{"de":"Fahrstreifentafel mit gegenverkehr und mit integriertem zeichen 275 zweistreifig in fahrtrichtung und zweistreifig in gegenrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/526-33.fahrstreifentafel.mit_gegenverkehr_und_mit_integriertem_zeichen_275.zweistreifig_in_fahrtrichtung_und_zweistreifig_in_gegenrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:531-10":{"de":"Einengungstafel darstellung ohne gegenverkehr noch ein fahrstreifen links in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/531-10.einengungstafel_darstellung_ohne_gegenverkehr.noch_ein_fahrstreifen_links_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:531-11":{"de":"Einengungstafel darstellung ohne gegenverkehr noch zwei fahrstreifen links in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/531-11.einengungstafel_darstellung_ohne_gegenverkehr_noch_zwei_fahrstreifen_links_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:531-12":{"de":"Einengungstafel darstellung ohne gegenverkehr noch drei fahrstreifen links in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/531-12.einengungstafel_darstellung_ohne_gegenverkehr_noch_drei_fahrstreifen_links_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:531-13":{"de":"Einengungstafel darstellung ohne gegenverkehr noch vier fahrstreifen links in fahrtrichtung","severity":"indicate","image":"https://gabischatz.de.cool/img/stvo/531-13.einengungstafel_darstellung_ohne_gegenverkehr_noch_vier_fahrstreifen_links_in_fahrtrichtung.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:629-10":{"de":"Leitbord mit leitbake rechts","severity":"info","image":"https://gabischatz.de.cool/img/stvo/629-10.leitbord_mit_leitbake_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:721":{"de":"Gruenpfeil radverkehr geradeaus","severity":"info","image":"https://gabischatz.de.cool/img/stvo/721.gruenpfeil_radverkehr_geradeaus.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:721 rechts":{"de":"Gruenpfeil radverkehr rechts","severity":"info","image":"https://gabischatz.de.cool/img/stvo/721.gruenpfeil_radverkehr_rechts.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1000-12":{"de":"Fussgaenger gehweg gegenueber benutzen linksweisend","severity":"","image":"https://gabischatz.de.cool/img/stvo/1000-12.fussgaenger_gehweg_gegenueber_benutzen.linksweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1000-22":{"de":"Fussgaenger gehweg gegenueber benutzen rechtsweisend","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1000-22.fussgaenger_gehweg_gegenueber_benutzen.rechtsweisend.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1000-31":{"de":"Beide richtungen, zwei gegengerichtete senkrechte pfeile","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1000-31.beide_richtungen,_zwei_gegengerichtete_senkrechte_pfeile.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1000-32":{"de":"Radfahrer kreuzen von rechts und links","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1000-32.radfahrer_kreuzen_von_rechts_und_links.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1000-33":{"de":"Radverkehr im gegenverkehr","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1000-33.radverkehr_im_gegenverkehr.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1010-66":{"de":"Elektrisch betriebene fahrzeuge","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1010-66.elektrisch_betriebene_fahrzeuge.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1010-68":{"de":"Elektrokleinstfahrzeuge ekfv","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1010-68.elektrokleinstfahrzeuge_ekfv.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1010-69":{"de":"Lastenfahrrad","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1010-69.lastenfahrrad.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1012-30":{"de":"Anfang","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1012-30.anfang.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1012-31":{"de":"Ende","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1012-31.ende.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1012-32":{"de":"Radfahrer absteigen","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1012-32.radfahrer_absteigen.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1020-12":{"de":"Radfahrer und anlieger frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1020-12.radfahrer_und_anlieger_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1020-30":{"de":"Anlieger frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1020-30.anlieger_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1022-1":{"de":"Linienverkehr und radfahrer frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1022-1.linienverkehr_und_radfahrer_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1022-10":{"de":"Radfahrer frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1022-10.radfahrer_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1022-16":{"de":"Elektrokleinstfahrzeuge frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1022-16.elektrokleinstfahrzeuge_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1022-17":{"de":"Lastenfahrrad frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1022-17.lastenfahrrad_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1024-16":{"de":"Strassenbahn frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1024-16.strassenbahn_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1026-33":{"de":"Einsatzfahrzeuge frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1026-33.einsatzfahrzeuge_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"},"DE:1026-35":{"de":"Lieferverkehr frei","severity":"supplement","image":"https://gabischatz.de.cool/img/stvo/1026-35.lieferverkehr_frei.svg","wikipedia":"https://de.wikipedia.org/wiki/Bildtafel_der_Verkehrszeichen_in_der_Bundesrepublik_Deutschland_seit_2017","osm_wiki":"https://wiki.openstreetmap.org/wiki/DE:Traffic_signs"}};
+
+    function escapeHtml(wert) {
+        return String(wert ?? "")
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -493,306 +32,933 @@
             .replace(/'/g, "&#39;");
     }
 
-    function formatTextToHtml(text) {
-        return escapeHtml(text)
-            .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-            .replace(/\n/g, "<br>");
+    function textZuHtml(text) {
+        return escapeHtml(text).replace(/\n/g, "<br>");
     }
 
-    function holeGruppenErklaerung(schluessel, wert) {
+    function verkehrszeichenTitel(text) {
+        const roh = String(text || "").trim();
+        if (!roh) return "Unbekanntes Verkehrszeichen";
+        return roh
+            .replace(/_/g, " ")
+            .replace(/\s+/g, " ")
+            .replace(/\b([a-zäöüß])/g, (m) => m.toUpperCase());
+    }
+
+    function normalizeTrafficSignCode(code) {
+        return String(code || "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .replace(/^de:/i, "DE:");
+    }
+
+    function baueVerkehrszeichenKarte(code) {
+        const norm = normalizeTrafficSignCode(code);
+        const eintrag = TRAFFIC_SIGN_INDEX[norm];
+
+        if (eintrag) {
+            const severityEmoji = eintrag.severity === "warn" ? "⚠️" : eintrag.severity === "error" ? "⛔" : "🚧";
+            const links = [];
+            if (eintrag.wikipedia) links.push(`<a href="${escapeHtml(eintrag.wikipedia)}" target="_blank" rel="noopener noreferrer">Wikipedia</a>`);
+            if (eintrag.osm_wiki) links.push(`<a href="${escapeHtml(eintrag.osm_wiki)}" target="_blank" rel="noopener noreferrer">OSM-Wiki</a>`);
+            return {
+                bekannt: true,
+                emoji: severityEmoji,
+                titel: verkehrszeichenTitel(eintrag.de || norm),
+                html: `
+                    <div class="tt-sign-card">
+                        <div class="tt-sign-head">
+                            <span class="tt-sign-code">${escapeHtml(norm)}</span>
+                            <span class="tt-sign-severity">${severityEmoji}</span>
+                        </div>
+                        ${eintrag.image ? `<div class="tt-sign-image"><img src="${escapeHtml(eintrag.image)}" alt="${escapeHtml(eintrag.de || norm)}" onerror="this.closest('.tt-sign-image')?.remove()"></div>` : ""}
+                        <div class="tt-sign-title">${escapeHtml(verkehrszeichenTitel(eintrag.de || norm))}</div>
+                        ${links.length ? `<div class="tt-sign-links">${links.join(" · ")}</div>` : ""}
+                    </div>
+                `
+            };
+        }
+
+        const tempoTreffer = norm.match(/^DE:274-(\d+)$/);
+        if (tempoTreffer) {
+            const kmh = tempoTreffer[1];
+            const svgUrl = `${SVG_BASE}274-${kmh}.zulaessige_hoechstgeschwindigkeit.svg`;
+            return {
+                bekannt: false,
+                emoji: "🚦",
+                titel: `Tempo ${kmh}`,
+                html: `
+                    <div class="tt-sign-card">
+                        <div class="tt-sign-head">
+                            <span class="tt-sign-code">${escapeHtml(norm)}</span>
+                            <span class="tt-sign-severity">🚦</span>
+                        </div>
+                        <div class="tt-sign-image"><img src="${escapeHtml(svgUrl)}" alt="Tempo ${escapeHtml(kmh)}" onerror="this.closest('.tt-sign-image')?.remove()"></div>
+                        <div class="tt-sign-title">Zulässige Höchstgeschwindigkeit ${escapeHtml(kmh)} km/h</div>
+                    </div>
+                `
+            };
+        }
+
+        return {
+            bekannt: false,
+            emoji: "🚧",
+            titel: norm,
+            html: `
+                <div class="tt-sign-card">
+                    <div class="tt-sign-head">
+                        <span class="tt-sign-code">${escapeHtml(norm)}</span>
+                        <span class="tt-sign-severity">🚧</span>
+                    </div>
+                    <div class="tt-sign-title">Dieses Verkehrszeichen ist noch nicht genauer beschrieben.</div>
+                </div>
+            `
+        };
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🚗 Hilfsfunktion: Fahrspuren-Diagramm als kleines HTML
+    //    Eingabe z.B.: "left|through;right"  oder  "through|right"
+    //    Trenner: | = zwischen Spuren, ; = mehrere Richtungen in einer Spur
+    // ═══════════════════════════════════════════════════════════════
+
+    const PFEIL = {
+        left:             "⬅️",
+        slight_left:      "↖️",
+        sharp_left:       "↩️",
+        through:          "⬆️",
+        right:            "➡️",
+        slight_right:     "↗️",
+        sharp_right:      "↪️",
+        reverse:          "🔄",
+        merge_to_left:    "↙️",
+        merge_to_right:   "↘️",
+        none:             "❌",
+    };
+
+    function spurDiagramm(wert) {
+
+        // Spuren auseinandernehmen (Trenner: |)
+        const spuren = wert.split("|");
+
+        // Jede Spur als Kästchen mit Pfeilen aufbauen
+        const kaestchen = spuren.map((spur) => {
+
+            // Mehrere Richtungen in einer Spur (Trenner: ;)
+            const richtungen = spur.split(";");
+
+            const pfeilHtml = richtungen.map((r) => {
+                const p = PFEIL[r.trim()] || "❓";
+                return `<span title="${r}">${p}</span>`;
+            }).join(" ");
+
+            return `<div class="spur-kaestchen">${pfeilHtml}<br><small style="font-size:9px;color:#666;">${spur}</small></div>`;
+        });
+
+        return `<div class="spur-diagramm">${kaestchen.join("")}</div>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 📚 ERKLÄRUNGS-DATENBANK — für ein Kind von 6 Jahren erklärt
+    //
+    //    WICHTIG: source:maxspeed Werte heißen "DE:urban" nicht "urban"!
+    //    Der Schlüssel im JS-Objekt muss exakt dem OSM-Wert entsprechen.
+    // ═══════════════════════════════════════════════════════════════
+
+    const ERKLAERUNGEN = {
+
+        // ── highway (Straßentyp) ────────────────────────────────────
+        highway: {
+            motorway:        { emoji: "🚗💨", text: "Das ist die Autobahn! Hier dürfen nur Autos und LKWs sehr schnell fahren. Fahrräder und Fußgänger dürfen hier gar nicht hin!" },
+            motorway_link:   { emoji: "↪️🚗", text: "Das ist eine Auffahrt oder Abfahrt von der Autobahn. Hier kommt man von der Autobahn runter oder fährt drauf." },
+            trunk:           { emoji: "🛣️", text: "Eine sehr große und wichtige Schnellstraße — fast so groß wie die Autobahn, aber mit Ampeln!" },
+            trunk_link:      { emoji: "↪️🛣️", text: "Eine Auffahrt oder Abfahrt von der Schnellstraße." },
+            primary:         { emoji: "🔴🛤️", text: "Eine wichtige große Straße, die Städte verbindet. Hier fahren viele Autos." },
+            primary_link:    { emoji: "↪️🔴", text: "Ein kleines Verbindungsstück zu einer wichtigen Straße." },
+            secondary:       { emoji: "🟠🛤️", text: "Eine mittelgroße Straße, die Dörfer oder Stadtteile verbindet." },
+            secondary_link:  { emoji: "↪️🟠", text: "Ein kleines Verbindungsstück zu einer Mittelstraße." },
+            tertiary:        { emoji: "🟡🛤️", text: "Eine kleinere Straße in der Stadt oder auf dem Land." },
+            tertiary_link:   { emoji: "↪️🟡", text: "Ein kleines Verbindungsstück zu einer kleineren Straße." },
+            unclassified:    { emoji: "⬜🛤️", text: "Eine ganz normale kleine Straße, die noch keinen besonderen Namen bekommen hat." },
+            residential:     { emoji: "🏘️", text: "Das ist eine Wohnstraße! Hier wohnen die Menschen in ihren Häusern. Es gibt wenig Verkehr, dafür viele Kinder!" },
+            service:         { emoji: "🔧🛤️", text: "Das ist eine kleine Hilfsstraße. Man benutzt sie, um zu einem Parkplatz oder in eine Einfahrt zu kommen." },
+            living_street:   { emoji: "🧒🎮", text: "Das ist eine Spielstraße! Kinder dürfen hier spielen. Autos müssen ganz, ganz langsam fahren und auf die Kinder aufpassen.", svgUrl: SVG_BASE + "325.1.beginn_einer_spielstrasse.svg" },
+            pedestrian:      { emoji: "🚶", text: "Hier dürfen nur Fußgänger laufen — keine Autos! Das ist eine Fußgängerzone.", svgUrl: SVG_BASE + "239.sonderweg_fussgaenger.svg" },
+            track:           { emoji: "🚜", text: "Das ist ein Feldweg für Traktoren und Landwirte. Hier wird die Ernte eingefahren!" },
+            bus_guideway:    { emoji: "🚌", text: "Das ist eine ganz besondere Spur — nur für Busse! Damit kommen die Busse schnell ans Ziel." },
+            escape:          { emoji: "⛰️🛑", text: "Das ist ein Notfallweg an einem Berg, damit Autos mit kaputten Bremsen sicher stoppen können." },
+            raceway:         { emoji: "🏎️", text: "Das ist eine Rennstrecke! Hier fahren Rennautos oder Motorräder ganz schnell um die Wette." },
+            road:            { emoji: "❓🛤️", text: "Das ist eine Straße, aber man weiß noch nicht genau was für eine. Noch nicht eingetragen!" },
+            footway:         { emoji: "👟", text: "Das ist ein Fußweg — nur zum Laufen! Keine Autos, keine Fahrräder.", svgUrl: SVG_BASE + "239.sonderweg_fussgaenger.svg" },
+            bridleway:       { emoji: "🐴", text: "Das ist ein Reitweg! Hier dürfen Pferde und Reiter lang — und manchmal auch Fahrräder.", svgUrl: SVG_BASE + "238.sonderweg_reiter.svg" },
+            steps:           { emoji: "👣", text: "Das sind Treppen! Hier muss man die Stufen hochsteigen oder runtergehen." },
+            corridor:        { emoji: "🏫", text: "Das ist ein Flur oder Gang — meistens in einem Gebäude, wie in der Schule!" },
+            elevator:        { emoji: "🛗", text: "Das ist ein Aufzug! Man drückt einen Knopf und fährt nach oben oder unten." },
+            cycleway:        { emoji: "🚲", text: "Das ist ein Fahrradweg! Hier dürfen nur Fahrräder fahren. Super zum Radeln!", svgUrl: SVG_BASE + "237.sonderweg_radfahrer.svg" },
+            path:            { emoji: "🌿", text: "Das ist ein kleiner Weg, oft in der Natur. Manchmal dürfen dort Fußgänger, Fahrräder oder sogar Pferde lang." },
+        },
+
+        // ── service (Art der Hilfsstraße) ───────────────────────────
+        service: {
+            driveway:         { emoji: "🏠🚗", text: "Das ist eine Einfahrt zu einem Haus oder Parkplatz. Hier parkt die Familie ihr Auto." },
+            parking_aisle:    { emoji: "🅿️", text: "Das ist der kleine Weg zwischen den Parkplätzen. Hier sucht man eine Parklücke." },
+            alley:            { emoji: "🏙️", text: "Das ist eine enge Gasse zwischen Häusern. Oft zum Anliefern von Sachen." },
+            "drive-through":  { emoji: "🍔🚗", text: "Hier kann man mit dem Auto direkt an einem Schalter bestellen — zum Beispiel bei McDonald's!" },
+            emergency_access: { emoji: "🚒", text: "Das ist ein Weg nur für Feuerwehr und Krankenwagen im Notfall. Bitte freihalten!" },
+            bus:              { emoji: "🚌", text: "Das ist ein kleiner Weg speziell für Busse, zum Beispiel zum Busbahnhof." },
+            slipway:          { emoji: "⛵", text: "Das ist eine Bootsrampe! Hier schieben die Leute ihr Boot ins Wasser." },
+        },
+
+        // ── surface (Belag) ─────────────────────────────────────────
+        surface: {
+            paved:        { emoji: "✅", text: "Der Weg hat einen festen Belag — glatt und gut zum Fahren!" },
+            unpaved:      { emoji: "🪨", text: "Der Weg hat keinen festen Belag. Vielleicht Schotter oder einfach Erde — ein bisschen holprig!" },
+            asphalt:      { emoji: "⬛", text: "Der Weg ist aus schwarzem Asphalt gemacht — wie die meisten Straßen bei uns." },
+            concrete:     { emoji: "🔲", text: "Der Weg ist aus grauem Beton gemacht — hart und glatt, wie ein Bürgersteig." },
+            paving_stones:{ emoji: "🧱", text: "Der Weg hat Pflastersteine — schöne alte Steine, wie in der Altstadt. Ein bisschen wackelig!" },
+            cobblestone:  { emoji: "🪨🪨", text: "Der Weg hat runde Kopfsteinpflaster — das rüttelt beim Fahren ganz schön!" },
+            sett:         { emoji: "🧩", text: "Der Weg hat rechteckige Steinplatten — schöner als Kopfsteinpflaster." },
+            compacted:    { emoji: "🟤", text: "Der Weg ist fest zusammengedrückt — aus Schotter oder Erde, aber schon ganz glatt." },
+            fine_gravel:  { emoji: "⚪", text: "Der Weg hat ganz feinen kleinen Schotter. Etwas holprig, aber gut." },
+            gravel:       { emoji: "🟡", text: "Der Weg hat Kieselsteine. Ein bisschen holprig — aber Mountainbikes lieben das!" },
+            ground:       { emoji: "🟫", text: "Einfach der Erdboden — nichts draufgelegt. Bei Regen wird es matschig!" },
+            dirt:         { emoji: "💩", text: "Ein Erdweg — wenn es regnet, wird es sehr matschig. Gummistiefel anziehen!" },
+            mud:          { emoji: "💧🟫", text: "Hier ist es matschig und nass. Ohne Gummistiefel geht hier gar nichts!" },
+            sand:         { emoji: "🏖️", text: "Der Weg besteht aus Sand — wie am Strand. Gehen geht, aber Fahrradfahren ist schwer!" },
+            grass:        { emoji: "🌿", text: "Der Weg geht über Gras — schön weich, aber bei Regen sehr rutschig." },
+            wood:         { emoji: "🪵", text: "Der Weg ist aus Holz — wie ein Steg über ein Sumpfgebiet oder am See." },
+            metal:        { emoji: "🔩", text: "Der Weg besteht aus Metall — zum Beispiel auf einer Brücke oder Feuertreppe." },
+        },
+
+        // ── maxspeed (Höchstgeschwindigkeit) — mit SVG-Schildern ────
+        maxspeed: {
+            "5":              { emoji: "🐢", text: "Hier darf man nur 5 km/h fahren — das ist Schrittgeschwindigkeit, so schnell wie du rennen kannst!",  svgUrl: SVG_BASE + "274-5.zulaessige_hoechstgeschwindigkeit.svg" },
+            "10":             { emoji: "🚶", text: "Hier darf man nur 10 km/h fahren — ganz, ganz langsam!",                                              svgUrl: SVG_BASE + "274-10.zulaessige_hoechstgeschwindigkeit.svg" },
+            "20":             { emoji: "🚲", text: "Hier darf man nur 20 km/h fahren — ungefähr so schnell wie ein Fahrrad.",                             svgUrl: SVG_BASE + "274-20.zulaessige_hoechstgeschwindigkeit.svg" },
+            "30":             { emoji: "🚗💨", text: "Hier darf man 30 km/h fahren — in vielen Wohngebieten die Regel.",                                  svgUrl: SVG_BASE + "274-30.zulaessige_hoechstgeschwindigkeit.svg" },
+            "40":             { emoji: "🚗💨", text: "40 km/h — etwas schneller als 30, aber noch ruhig.",                                                svgUrl: SVG_BASE + "274-40.zulaessige_hoechstgeschwindigkeit.svg" },
+            "50":             { emoji: "🚗💨💨", text: "50 km/h — das ist das normale Tempo in der Stadt!",                                               svgUrl: SVG_BASE + "274-50.zulaessige_hoechstgeschwindigkeit.svg" },
+            "60":             { emoji: "🚗💨💨", text: "60 km/h — etwas schneller als in der Stadt.",                                                     svgUrl: SVG_BASE + "274-60.zulaessige_hoechstgeschwindigkeit.svg" },
+            "70":             { emoji: "🚗💨💨", text: "70 km/h — auf manchen Landstraßen.",                                                              svgUrl: SVG_BASE + "274-70.zulaessige_hoechstgeschwindigkeit.svg" },
+            "80":             { emoji: "🛣️", text: "80 km/h — auf der Landstraße.",                                                                       svgUrl: SVG_BASE + "274-80.zulaessige_hoechstgeschwindigkeit.svg" },
+            "90":             { emoji: "🛣️💨", text: "90 km/h — auf manchen Bundesstraßen.",                                                              svgUrl: SVG_BASE + "274-90.zulaessige_hoechstgeschwindigkeit.svg" },
+            "100":            { emoji: "🛣️💨", text: "100 km/h — auf Schnellstraßen.",                                                                    svgUrl: SVG_BASE + "274-100.zulaessige_hoechstgeschwindigkeit.svg" },
+            "110":            { emoji: "🛣️💨💨", text: "110 km/h — auf manchen Autobahnen in Europa.",                                                    svgUrl: SVG_BASE + "274-110.zulaessige_hoechstgeschwindigkeit.svg" },
+            "120":            { emoji: "🛣️💨💨", text: "120 km/h — auf manchen Autobahnen.",                                                              svgUrl: SVG_BASE + "274-120.zulaessige_hoechstgeschwindigkeit.svg" },
+            "130":            { emoji: "🛣️💨💨", text: "130 km/h — das Tempo-Limit auf Autobahnen.",                                                      svgUrl: SVG_BASE + "274-130.zulaessige_hoechstgeschwindigkeit.svg" },
+            "DE:living_street":{ emoji: "🧒🎮", text: "Das ist eine Spielstraße in Deutschland — Autos dürfen nur Schritt fahren (ca. 7 km/h)!",          svgUrl: SVG_BASE + "325.1.beginn_einer_spielstrasse.svg" },
+            "DE:urban":       { emoji: "🏙️", text: "Innerorts in Deutschland — also 50 km/h, wenn kein anderes Schild da ist." },
+            "DE:rural":       { emoji: "🌳", text: "Außerorts in Deutschland — also 100 km/h, wenn kein anderes Schild da ist." },
+            "none":           { emoji: "💨🔥", text: "Keine Geschwindigkeitsbegrenzung! Das gibt es auf manchen deutschen Autobahnen." },
+        },
+
+        // ── source:maxspeed (Woher kommt das Tempolimit?) ───────────
+        //
+        // FEHLER-ERKLÄRUNG: Früher standen hier "urban", "rural" usw.
+        // Das war falsch! In OSM heißen die Werte "DE:urban", "DE:rural".
+        // Deshalb hat der Tooltip bei "source:maxspeed = DE:urban" nichts
+        // gefunden — der Schlüssel "urban" passte nie zu "DE:urban".
+        // LÖSUNG: Schlüssel jetzt exakt wie in OSM: "DE:urban" usw.
+        "source:maxspeed": {
+            "DE:motorway":      { emoji: "🛣️💨", text: "Das Tempolimit gilt wegen der Autobahn-Regel. In Deutschland: 130 km/h.",                          svgUrl: SVG_BASE + "274-130.zulaessige_hoechstgeschwindigkeit.svg" },
+            "DE:rural":         { emoji: "🌾", text: "Das Tempolimit gilt wegen der Außerorts-Regel. Auf dem Land. In Deutschland: 100 km/h.",              svgUrl: SVG_BASE + "274-100.zulaessige_hoechstgeschwindigkeit.svg" },
+            "DE:urban":         { emoji: "🏙️", text: "Das Tempolimit gilt wegen der Innerorts-Regel. In der Stadt. Das Ortsschild macht's! In Deutschland: 50 km/h.",  svgUrl: SVG_BASE + "274-50.zulaessige_hoechstgeschwindigkeit.svg" },
+            "DE:walk":          { emoji: "🚶", text: "Schrittgeschwindigkeit (5–7 km/h) — wegen eines Schildes.",                                          svgUrl: SVG_BASE + "325.1.beginn_einer_spielstrasse.svg" },
+            "DE:living_street": { emoji: "🧒🎮", text: "Wegen der Spielstraße! Autos müssen ganz langsam fahren.",                                         svgUrl: SVG_BASE + "325.1.beginn_einer_spielstrasse.svg" },
+            "DE:bicycle_road":  { emoji: "🚲🏆", text: "Das ist eine Fahrradstraße! Fahrräder sind die Chefs — max. 30 km/h.",                             svgUrl: SVG_BASE + "244.1.beginn_einer_fahrradstrasse.svg" },
+            "DE:zone":          { emoji: "🅿️", text: "Eine Geschwindigkeitszone — z.B. Tempo-30-Zone. Das Schild am Anfang legt das Limit fest.",          svgUrl: SVG_BASE + "274.1.beginn_einer_tempo_30-zone.svg" },
+            "sign":             { emoji: "🚦", text: "Das Tempolimit kommt von einem Verkehrsschild am Straßenrand." },
+            "survey":           { emoji: "📋", text: "Jemand hat das Tempolimit persönlich vor Ort aufgeschrieben." },
+        },
+
+        // ── turn:lanes / turn:lanes:forward / turn:lanes:backward ───
+        //
+        // Diese Einträge werden DYNAMISCH berechnet in findeErklaerung().
+        // Der _info-Marker verhindert, dass die Datenbank-Suche greift.
+        // Stattdessen übernimmt findeTurnLanesErklaerung() die Arbeit.
+        "turn:lanes":           { _info: true },
+        "turn:lanes:forward":   { _info: true },
+        "turn:lanes:backward":  { _info: true },
+        "turn:lanes:both_ways": { _info: true },
+
+        // ── cycleway:both / cycleway:left / cycleway:right ───────────
+        "cycleway:both": {
+            no:          { emoji: "🚲❌", text: "Auf dieser Straße gibt es auf beiden Seiten keinen Fahrradweg." },
+            lane:        { emoji: "🚲📏", text: "Auf beiden Seiten gibt es eine Fahrradspur — auf der Straße markiert.", svgUrl: SVG_BASE + "237.sonderweg_radfahrer.svg" },
+            track:       { emoji: "🚲🌿", text: "Auf beiden Seiten gibt es einen richtigen Fahrradweg, getrennt von der Straße.", svgUrl: SVG_BASE + "237.sonderweg_radfahrer.svg" },
+            shared_lane: { emoji: "🚲🚗", text: "Fahrräder und Autos teilen sich eine Spur — aufgemalte Pfeile zeigen es." },
+        },
+
+        // ── sidewalk (Bürgersteig) ──────────────────────────────────
+        sidewalk: {
+            both:     { emoji: "🚶🚶", text: "Diese Straße hat auf beiden Seiten einen Bürgersteig! Für Fußgänger auf jeder Seite." },
+            left:     { emoji: "🚶⬅️", text: "Es gibt nur links einen Bürgersteig." },
+            right:    { emoji: "🚶➡️", text: "Es gibt nur rechts einen Bürgersteig." },
+            no:       { emoji: "🚶❌", text: "Hier gibt es gar keinen Bürgersteig! Aufpassen beim Laufen." },
+            separate: { emoji: "🚶📍", text: "Der Bürgersteig ist als eigener Weg auf der Karte eingetragen." },
+        },
+
+        // ── lanes (Fahrspuren) ──────────────────────────────────────
+        lanes: {
+            "1": { emoji: "1️⃣", text: "Der Weg hat eine Spur — Autos fahren in eine Richtung hintereinander." },
+            "2": { emoji: "2️⃣", text: "Der Weg hat zwei Spuren — je eine für jede Richtung, wie viele normale Straßen." },
+            "3": { emoji: "3️⃣", text: "Drei Spuren! Das ist schon eine größere Straße." },
+            "4": { emoji: "4️⃣", text: "Vier Spuren! Das ist eine richtig große Straße!" },
+        },
+
+        // ── lanes:forward / lanes:backward ─────────────────────────
+        "lanes:forward": {
+            "1": { emoji: "➡️1️⃣", text: "In Fahrtrichtung vorwärts gibt es eine Spur." },
+            "2": { emoji: "➡️2️⃣", text: "In Fahrtrichtung vorwärts gibt es zwei Spuren." },
+            "3": { emoji: "➡️3️⃣", text: "In Fahrtrichtung vorwärts gibt es drei Spuren." },
+        },
+        "lanes:backward": {
+            "1": { emoji: "⬅️1️⃣", text: "In Fahrtrichtung rückwärts gibt es eine Spur." },
+            "2": { emoji: "⬅️2️⃣", text: "In Fahrtrichtung rückwärts gibt es zwei Spuren." },
+            "3": { emoji: "⬅️3️⃣", text: "In Fahrtrichtung rückwärts gibt es drei Spuren." },
+        },
+
+        // ── access ──────────────────────────────────────────────────
+        access: {
+            yes:          { emoji: "✅", text: "Hier darf jeder lang! Für alle offen." },
+            no:           { emoji: "🚫", text: "Hier darf niemand lang! Zutritt verboten.", svgUrl: SVG_BASE + "250.verbot_fuer_fahrzeuge_aller_art.svg" },
+            private:      { emoji: "🔒", text: "Das ist ein Privatweg! Nur der Besitzer darf hier lang." },
+            permissive:   { emoji: "🔓", text: "Man darf hier lang, aber der Besitzer könnte es eines Tages verbieten." },
+            destination:  { emoji: "🏁", text: "Hier darf man nur fahren, wenn man auch wirklich dorthin will. Kein Durchfahren!" },
+            customers:    { emoji: "🛍️", text: "Nur für Kunden! Zum Beispiel der Parkplatz eines Supermarkts." },
+            designated:   { emoji: "🎯", text: "Dieser Weg ist extra für eine bestimmte Gruppe gemacht — z.B. nur für Fahrräder." },
+            dismount:     { emoji: "🚴⬇️", text: "Hier musst du vom Fahrrad absteigen und es schieben!" },
+            agricultural: { emoji: "🚜", text: "Nur für Landwirte und ihre Traktoren!" },
+            forestry:     { emoji: "🌲", text: "Nur für Forstarbeiter und ihre Fahrzeuge." },
+        },
+
+        // ── foot ────────────────────────────────────────────────────
+        foot: {
+            yes:        { emoji: "👟✅", text: "Fußgänger dürfen hier lang!", svgUrl: SVG_BASE + "239.sonderweg_fussgaenger.svg" },
+            no:         { emoji: "👟🚫", text: "Fußgänger dürfen hier NICHT lang!" },
+            designated: { emoji: "👟🎯", text: "Das ist ein extra Fußweg — speziell fürs Laufen gemacht.", svgUrl: SVG_BASE + "239.sonderweg_fussgaenger.svg" },
+            permissive: { emoji: "👟🔓", text: "Laufen ist erlaubt, aber der Besitzer kann es ändern." },
+            private:    { emoji: "👟🔒", text: "Nur der Besitzer darf hier zu Fuß lang." },
+        },
+
+        // ── bicycle ─────────────────────────────────────────────────
+        bicycle: {
+            yes:        { emoji: "🚲✅", text: "Fahrräder dürfen hier fahren! Los geht's!", svgUrl: SVG_BASE + "237.sonderweg_radfahrer.svg" },
+            no:         { emoji: "🚲🚫", text: "Fahrräder dürfen hier NICHT fahren!" },
+            designated: { emoji: "🚲🎯", text: "Das ist ein extra Fahrradweg!", svgUrl: SVG_BASE + "237.sonderweg_radfahrer.svg" },
+            dismount:   { emoji: "🚲⬇️", text: "Hier musst du vom Fahrrad absteigen und es schieben!" },
+            permissive: { emoji: "🚲🔓", text: "Fahrrad erlaubt, aber der Besitzer kann es ändern." },
+            private:    { emoji: "🚲🔒", text: "Nur der Besitzer darf hier radfahren." },
+        },
+
+        // ── horse ────────────────────────────────────────────────────
+        horse: {
+            yes:        { emoji: "🐴✅", text: "Pferde und Reiter dürfen hier lang!", svgUrl: SVG_BASE + "238.sonderweg_reiter.svg" },
+            no:         { emoji: "🐴🚫", text: "Pferde dürfen hier NICHT lang!" },
+            designated: { emoji: "🐴🎯", text: "Das ist ein extra Reitweg!", svgUrl: SVG_BASE + "238.sonderweg_reiter.svg" },
+        },
+
+        // ── oneway ──────────────────────────────────────────────────
+        oneway: {
+            yes:  { emoji: "➡️", text: "Das ist eine Einbahnstraße! Hier darf man nur in eine Richtung fahren." },
+            no:   { emoji: "↔️", text: "Hier darf man in beide Richtungen fahren — kein Problem!" },
+            "-1": { emoji: "⬅️", text: "Einbahnstraße in die andere Richtung — entgegen der normalen Kartenpfeile." },
+        },
+
+        // ── junction ─────────────────────────────────────────────────
+        junction: {
+            roundabout:      { emoji: "🔄", text: "Das ist ein Kreisverkehr! Alle Autos fahren im Kreis — wer schon im Kreis ist, hat Vorfahrt!" },
+            mini_roundabout: { emoji: "🔄", text: "Ein kleiner Kreisverkehr — fast wie der große, aber mit wenig Platz." },
+        },
+
+        // ── bridge ───────────────────────────────────────────────────
+        bridge: {
+            yes:      { emoji: "🌉", text: "Das ist eine Brücke! Sie führt über einen Fluss, ein Tal oder eine andere Straße." },
+            viaduct:  { emoji: "🏗️", text: "Das ist ein Viadukt — eine riesige Brücke auf hohen Säulen, oft über Täler." },
+            aqueduct: { emoji: "💧🌉", text: "Das ist ein Aquädukt — eine alte Wasserbrücke. Die Römer haben solche gebaut!" },
+        },
+
+        // ── tunnel ───────────────────────────────────────────────────
+        tunnel: {
+            yes:     { emoji: "🚇", text: "Das ist ein Tunnel! Der Weg geht unter der Erde durch — wie bei der U-Bahn." },
+            culvert: { emoji: "🌊🚇", text: "Das ist ein kleines Rohr unter dem Weg — damit das Wasser darunter durchfließen kann." },
+        },
+
+        // ── lit ──────────────────────────────────────────────────────
+        lit: {
+            yes: { emoji: "💡", text: "Dieser Weg hat Straßenlaternen! Bei Dunkelheit kann man hier gut sehen." },
+            no:  { emoji: "🌑", text: "Hier gibt es keine Beleuchtung. In der Nacht ist es ganz dunkel!" },
+        },
+
+        // ── layer ────────────────────────────────────────────────────
+        layer: {
+            "-2": { emoji: "⬇️⬇️", text: "Zwei Ebenen tiefer — wie ein tiefer U-Bahn-Tunnel." },
+            "-1": { emoji: "⬇️", text: "Dieser Weg liegt eine Ebene tiefer — zum Beispiel unter einer Brücke oder im Tunnel." },
+            "0":  { emoji: "➡️", text: "Normale Ebene — einfach auf dem Boden." },
+            "1":  { emoji: "⬆️", text: "Eine Ebene höher — zum Beispiel auf einer Brücke." },
+            "2":  { emoji: "⬆️⬆️", text: "Zwei Ebenen höher — ganz oben!" },
+        },
+    };
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🛠️ KERN-LOGIK: Erklärung für ein Tag-Paar finden
+    // ═══════════════════════════════════════════════════════════════
+
+    function findeErklaerung(schluessel, wert) {
+
+        // ── Sonderfall: name (Straßenname) ──────────────────────────
+        if (schluessel === "name") {
+            return { emoji: "📛", text: `Der offizielle Name dieses Weges ist "${wert}". Vielleicht kennt ihr die Straße!` };
+        }
+
+        // ── Sonderfall: ref (Straßennummer) ─────────────────────────
+        if (schluessel === "ref") {
+            return { emoji: "🔢", text: `Das ist die Nummer dieser Straße: "${wert}". Manchmal sieht man solche Nummern auf Straßenschildern.` };
+        }
+
+        // ── Sonderfall: width (Breite) ──────────────────────────────
+        if (schluessel === "width") {
+            const m = parseFloat(wert);
+            const bewertung = isNaN(m) ? "" : m < 3 ? " Ganz schön eng!" : m >= 10 ? " Das ist sehr breit!" : " Das ist eine normale Breite.";
+            return { emoji: "📏", text: `Dieser Weg ist ${wert} Meter breit.${bewertung}` };
+        }
+
+        // ── Sonderfall: turn:lanes und seine Varianten ──────────────
+        if (
+            schluessel === "turn:lanes" ||
+            schluessel === "turn:lanes:forward" ||
+            schluessel === "turn:lanes:backward" ||
+            schluessel === "turn:lanes:both_ways"
+        ) {
+            return findeTurnLanesErklaerung(schluessel, wert);
+        }
+
+        // ── Sonderfall: traffic_sign ─────────────────────────────────
+        if (schluessel === "traffic_sign") {
+            return findeVerkehrszeichenErklaerung(wert);
+        }
+
+        // ── Sonderfall: maxspeed mit Zahl, die nicht in DB ist ───────
+        if (schluessel === "maxspeed") {
+            // Erst Datenbank prüfen
+            if (ERKLAERUNGEN.maxspeed && ERKLAERUNGEN.maxspeed[wert]) {
+                return ERKLAERUNGEN.maxspeed[wert];
+            }
+            // Dynamisch für unbekannte Zahlen
+            const kmh = parseFloat(wert);
+            if (!isNaN(kmh)) {
+                const stimmung = kmh <= 30
+                    ? "Das ist ganz schön langsam — Wohngebiet!"
+                    : kmh >= 100
+                    ? "Das ist sehr schnell — Schnellstraße!"
+                    : "Das ist eine normale Geschwindigkeit.";
+                const num = String(Math.round(kmh));
+                const svgUrl = `${SVG_BASE}274-${num}.zulaessige_hoechstgeschwindigkeit.svg`;
+                return { emoji: "🚦", text: `Hier darf man maximal ${kmh} km/h fahren. ${stimmung}`, svgUrl };
+            }
+        }
+
+        // ── Normale Suche in der Datenbank ───────────────────────────
         const gruppe = ERKLAERUNGEN[schluessel];
         if (!gruppe) return null;
-        if (gruppe[wert]) return gruppe[wert];
-        const klein = wert.toLowerCase();
-        if (gruppe[klein]) return gruppe[klein];
-        if (typeof gruppe.template === "function") {
-            return { emoji: "📌", text: gruppe.template(wert) };
-        }
-        return null;
+
+        // _info-Marker bedeutet: nur dynamisch behandeln (s.o.)
+        if (gruppe._info) return null;
+
+        return gruppe[wert] || null;
     }
 
-    function findeBesteErklaerung(schluessel, wert, alleTags) {
-        if (schluessel === "traffic_sign") {
-            for (const [nummer, text] of Object.entries(TRAFFIC_SIGN_BESCHREIBUNGEN)) {
-                if (wert.includes(nummer)) {
-                    return { emoji: "🚦", text: `**Verkehrszeichen ${nummer}** – ${text}` };
-                }
-            }
-            if (wert.startsWith("AT:")) return { emoji: "🚦", text: `Österreichisches Verkehrszeichen ${wert}` };
-            if (wert.startsWith("CH:")) return { emoji: "🚦", text: `Schweizer Verkehrszeichen ${wert}` };
-            return { emoji: "🚦", text: `Verkehrszeichen – Dieses Schild hat die Kennung "${wert}".` };
-        }
+    // ── turn:lanes Erklärer ──────────────────────────────────────────
+    //
+    // Erklärt z.B. "left|through;right" so:
+    //   Spur 1: links abbiegen
+    //   Spur 2: geradeaus oder rechts abbiegen
+    // Plus: ein kleines Pfeil-Diagramm
+    function findeTurnLanesErklaerung(schluessel, wert) {
 
-        if (schluessel === "name") {
-            return { emoji: "📛", text: `Der offizielle Name dieses Weges ist **„${wert}"**.` };
-        }
+        const richtungsText = {
+            left:         "links abbiegen",
+            slight_left:  "leicht links",
+            sharp_left:   "scharf links",
+            through:      "geradeaus",
+            right:        "rechts abbiegen",
+            slight_right: "leicht rechts",
+            sharp_right:  "scharf rechts",
+            reverse:      "umkehren",
+            none:         "keine Abbiegung erlaubt",
+        };
 
-        if (schluessel === "ref") {
-            return { emoji: "🔢", text: `Das ist die Nummer dieses Weges oder dieser Straße: **„${wert}"**.` };
-        }
+        // Richtung des Tags vermerken
+        let richtungsInfo = "";
+        if (schluessel === "turn:lanes:forward")  richtungsInfo = " in Vorwärtsrichtung";
+        if (schluessel === "turn:lanes:backward") richtungsInfo = " in Rückwärtsrichtung";
+        if (schluessel === "turn:lanes:both_ways") richtungsInfo = " (beidseitig)";
 
-        if (schluessel === "lanes") {
-            const zahl = parseInt(wert);
-            if (!isNaN(zahl)) {
-                return { emoji: "🛣️", text: `Diese Straße hat zusammen **${zahl} Fahrspur${zahl === 1 ? "" : "en"}** in beide Richtungen.` };
-            }
-        }
-        if (schluessel === "lanes:forward") {
-            const zahl = parseInt(wert);
-            if (!isNaN(zahl)) {
-                return { emoji: "➡️🛣️", text: `In Fahrtrichtung gibt es **${zahl} Fahrspur${zahl === 1 ? "" : "en"}**.` };
-            }
-        }
-        if (schluessel === "lanes:backward") {
-            const zahl = parseInt(wert);
-            if (!isNaN(zahl)) {
-                return { emoji: "⬅️🛣️", text: `In der Gegenrichtung gibt es **${zahl} Fahrspur${zahl === 1 ? "" : "en"}**.` };
-            }
-        }
+        // Spuren parsen
+        const spuren = wert.split("|");
+        const spurBeschreibungen = spuren.map((spur, i) => {
+            const richtungen = spur.split(";")
+                .map(r => richtungsText[r.trim()] || r.trim())
+                .join(" oder ");
+            return `Spur ${i + 1}: ${richtungen}`;
+        });
 
-        if (schluessel === "surface") {
-            const erk = holeGruppenErklaerung("surface", wert);
-            if (erk) return erk;
-            return { emoji: "🪨", text: `Der Boden ist "${wert}".` };
-        }
+        const anzahl = spuren.length;
+        const einheit = anzahl === 1 ? "Spur" : "Spuren";
 
-        if (schluessel === "smoothness") {
-            const erk = holeGruppenErklaerung("smoothness", wert);
-            if (erk) return erk;
-        }
-
-        if (schluessel === "tracktype") {
-            const erk = holeGruppenErklaerung("tracktype", wert);
-            if (erk) return erk;
-        }
-
-        if (schluessel === "maxspeed") {
-            const zahl = parseFloat(wert);
-            if (!isNaN(zahl)) {
-                if (zahl <= 30) return { emoji: "🐢", text: `Tempo ${zahl} km/h – ganz langsam!` };
-                if (zahl <= 50) return { emoji: "🚗", text: `Tempo ${zahl} km/h – normal in der Stadt.` };
-                if (zahl <= 100) return { emoji: "🛣️", text: `Tempo ${zahl} km/h – schon recht schnell.` };
-                return { emoji: "💨", text: `Tempo ${zahl} km/h – sehr schnell!` };
-            }
-            const erk = holeGruppenErklaerung("maxspeed", wert);
-            if (erk) return erk;
-        }
-
-        if (schluessel === "oneway") {
-            const erk = holeGruppenErklaerung("oneway", wert);
-            if (erk) return erk;
-        }
-        if (schluessel === "oneway:bicycle") {
-            const erk = holeGruppenErklaerung("oneway:bicycle", wert);
-            if (erk) return erk;
-        }
-
-        if (schluessel === "bicycle") {
-            const erk = holeGruppenErklaerung("bicycle", wert);
-            if (erk) return erk;
-        }
-
-        if (schluessel === "foot") {
-            const erk = holeGruppenErklaerung("foot", wert);
-            if (erk) return erk;
-        }
-
-        if (schluessel === "access") {
-            const erk = holeGruppenErklaerung("access", wert);
-            if (erk) return erk;
-        }
-
-        if (schluessel === "amenity") {
-            const erk = holeGruppenErklaerung("amenity", wert);
-            if (erk) return erk;
-            return { emoji: "🏢", text: `Ein besonderer Ort: ${wert}.` };
-        }
-
-        if (schluessel === "tourism") {
-            const erk = holeGruppenErklaerung("tourism", wert);
-            if (erk) return erk;
-            return { emoji: "🧭", text: `Ein Ausflugs-Ort: ${wert}.` };
-        }
-
-        if (schluessel === "shop") {
-            const erk = holeGruppenErklaerung("shop", wert);
-            if (erk) return erk;
-            return { emoji: "🛍️", text: `Ein Laden: ${wert}. Hier kann man etwas kaufen.` };
-        }
-
-        if (schluessel === "leisure") {
-            const erk = holeGruppenErklaerung("leisure", wert);
-            if (erk) return erk;
-            return { emoji: "🎈", text: `Ein Freizeit-Ort: ${wert}.` };
-        }
-
-        if (schluessel === "natural") {
-            const erk = holeGruppenErklaerung("natural", wert);
-            if (erk) return erk;
-            return { emoji: "🌿", text: `Ein Naturobjekt: ${wert}.` };
-        }
-
-        if (schluessel === "waterway") {
-            const erk = holeGruppenErklaerung("waterway", wert);
-            if (erk) return erk;
-            return { emoji: "💧", text: `Ein Gewässer: ${wert}.` };
-        }
-
-        if (schluessel === "landuse") {
-            const erk = holeGruppenErklaerung("landuse", wert);
-            if (erk) return erk;
-            return { emoji: "🗺️", text: `Landnutzung: ${wert}.` };
-        }
-
-        if (schluessel === "building") {
-            const erk = holeGruppenErklaerung("building", wert);
-            if (erk) return erk;
-            return { emoji: "🏠", text: `Hier steht ein Gebäude: ${wert}.` };
-        }
-
-        if (schluessel === "historic") {
-            const erk = holeGruppenErklaerung("historic", wert);
-            if (erk) return erk;
-            return { emoji: "🏛️", text: `Ein historischer Ort: ${wert}.` };
-        }
-
-        if (schluessel === "public_transport") {
-            const erk = holeGruppenErklaerung("public_transport", wert);
-            if (erk) return erk;
-            return { emoji: "🚌", text: `Ein Ort für öffentliche Verkehrsmittel: ${wert}.` };
-        }
-
-        if (schluessel === "barrier") {
-            const erk = holeGruppenErklaerung("barrier", wert);
-            if (erk) return erk;
-            return { emoji: "🚧", text: `Eine Barriere oder Sperre: ${wert}.` };
-        }
-
-        if (schluessel === "railway") {
-            const erk = holeGruppenErklaerung("railway", wert);
-            if (erk) return erk;
-            return { emoji: "🚆", text: `Eine Eisenbahn: ${wert}.` };
-        }
-
-        if (schluessel.endsWith(":lanes")) {
-            const lanesTag = holeGruppenErklaerung(schluessel, wert);
-            if (lanesTag) return lanesTag;
-            const basisTag = schluessel.replace(":lanes", "");
-            return { emoji: "🛣️", text: `**Verschiedene Fahrspuren haben verschiedene Regeln!** ${wert}. Die Regel betrifft „${basisTag}".` };
-        }
-
-        const direkteErklaerung = holeGruppenErklaerung(schluessel, wert);
-        if (direkteErklaerung) return direkteErklaerung;
-
-        return null;
+        return {
+            emoji: "🛣️↕️",
+            text: `Das zeigt, wohin man auf den ${anzahl} ${einheit}${richtungsInfo} abbiegen darf:\n${spurBeschreibungen.join("\n")}`,
+            // Pfeil-Diagramm direkt im Tooltip anzeigen
+            extraHtml: spurDiagramm(wert),
+        };
     }
 
+    // ── traffic_sign Erklärer ────────────────────────────────────────
+    function findeVerkehrszeichenErklaerung(wert) {
+
+        const schilder = String(wert || "")
+            .split(";")
+            .map(s => normalizeTrafficSignCode(s))
+            .filter(Boolean);
+
+        if (!schilder.length) {
+            return {
+                emoji: "🚧",
+                text: "Hier steht, dass es ein Verkehrszeichen gibt.",
+            };
+        }
+
+        const karten = schilder.map(baueVerkehrszeichenKarte);
+        const bekannte = karten.filter(k => k.bekannt).length;
+        const unbekannte = karten.length - bekannte;
+
+        let zusammenfassung = "";
+        if (karten.length === 1) {
+            zusammenfassung = `Hier gibt es das Verkehrszeichen „${karten[0].titel}“.`;
+        } else {
+            zusammenfassung = `Hier sind ${karten.length} Verkehrszeichen eingetragen. ${bekannte ? `${bekannte} davon kenne ich schon genauer.` : ""}${unbekannte ? ` ${unbekannte} sind noch allgemeiner beschrieben.` : ""}`.trim();
+        }
+
+        return {
+            emoji: "🚧",
+            text: zusammenfassung + " Verkehrsschilder sagen uns, was erlaubt ist, worauf wir achten müssen oder wohin wir fahren dürfen.",
+            extraHtml: `<div class="tt-sign-grid">${karten.map(k => k.html).join("")}</div>`,
+        };
+    }
+
+    // Fallback: wenn gar nichts passt
+    function fallbackErklaerung(schluessel, wert) {
+        return {
+            emoji: "🔍",
+            text: `Hier steht: "${schluessel} = ${wert}". Das ist eine spezielle Information auf der Karte, die Kartenmacher brauchen.`,
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🎨 TOOLTIP-STIL — bunt und kindgerecht
+    // ═══════════════════════════════════════════════════════════════
+
+    const STIL = `
+        /* ── Tooltip-Box ──────────────────────────────────── */
+        #osm-kinder-tooltip {
+            position: fixed;
+            z-index: 99999;
+            max-width: 460px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #fff9e6 0%, #ffefc0 100%);
+            border: 3px solid #ffcc00;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(255,204,0,0.3);
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+            pointer-events: auto;
+            transition: opacity 0.15s ease;
+            opacity: 0;
+        }
+
+        /* ── Sichtbar-Klasse ─────────────────────────────── */
+        #osm-kinder-tooltip.sichtbar {
+            opacity: 1;
+        }
+
+        /* ── SVG-Schild zentriert oben ───────────────────── */
+        #osm-kinder-tooltip .tt-schild {
+            display: block;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        #osm-kinder-tooltip .tt-schild img {
+            height: 64px;
+            width: auto;
+            display: inline-block;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+        }
+
+        /* ── Emoji groß ──────────────────────────────────── */
+        #osm-kinder-tooltip .tt-emoji {
+            font-size: 26px;
+            display: block;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        /* ── Tag-Label (klein, grau) ─────────────────────── */
+        #osm-kinder-tooltip .tt-tag {
+            font-size: 10px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        /* ── Erklärungstext ──────────────────────────────── */
+        #osm-kinder-tooltip .tt-text {
+            font-size: 13px;
+            color: #444;
+            white-space: pre-line;
+        }
+
+        /* ── Spurdiagramm ────────────────────────────────── */
+        .spur-diagramm {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .spur-kaestchen {
+            background: #fffbe8;
+            border: 2px solid #ffcc00;
+            border-radius: 8px;
+            padding: 4px 8px;
+            text-align: center;
+            font-size: 16px;
+            min-width: 36px;
+        }
+
+        /* ── Verkehrszeichen-Karten ───────────────────────── */
+        .tt-sign-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .tt-sign-card {
+            background: #fffdf3;
+            border: 2px solid #ffd54a;
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .tt-sign-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .tt-sign-code {
+            font-size: 11px;
+            color: #666;
+            font-weight: 700;
+        }
+        .tt-sign-severity {
+            font-size: 16px;
+        }
+        .tt-sign-image {
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        .tt-sign-image img {
+            max-width: 100%;
+            max-height: 72px;
+            width: auto;
+            height: auto;
+            display: inline-block;
+        }
+        .tt-sign-title {
+            font-size: 12px;
+            line-height: 1.35;
+            color: #333;
+            font-weight: 600;
+        }
+        .tt-sign-links {
+            margin-top: 6px;
+            font-size: 11px;
+        }
+        .tt-sign-links a {
+            color: #0b57d0;
+            text-decoration: none;
+        }
+        .tt-sign-links a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Kleiner Pfeil am unteren Rand des Tooltips ──── */
+        #osm-kinder-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 20px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 12px solid #ffcc00;
+        }
+
+        /* ── Hover-Highlight auf Tag-Zeilen im Popup ─────── */
+        .osm-tag-zeile {
+            cursor: help;
+            border-radius: 6px;
+            transition: background 0.15s;
+            padding: 2px 4px;
+        }
+        .osm-tag-zeile:hover {
+            background: rgba(255, 204, 0, 0.2);
+        }
+    `;
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🖱️ TOOLTIP AUFBAUEN UND STEUERN
+    // ═══════════════════════════════════════════════════════════════
+
+    // Stil einfügen
+    const stilElement = document.createElement("style");
+    stilElement.textContent = STIL;
+    document.head.appendChild(stilElement);
+
+    // Tooltip-Element erstellen
     const tooltip = document.createElement("div");
     tooltip.id = "osm-kinder-tooltip";
     document.body.appendChild(tooltip);
 
-    function tooltipZeigen(x, y, schluessel, wert, alleTags) {
-        const erklaerung = findeBesteErklaerung(schluessel, wert, alleTags);
+    // Tooltip anzeigen
+    function tooltipZeigen(x, y, schluessel, wert) {
 
-        let emoji = "🔍";
-        let text = "";
+        const erklaerung = findeErklaerung(schluessel, wert) || fallbackErklaerung(schluessel, wert);
 
-        if (erklaerung) {
-            emoji = erklaerung.emoji || "📌";
-            text = erklaerung.text || "";
-        }
+        // SVG-Schild einbauen wenn vorhanden
+        const schildHtml = erklaerung.svgUrl
+            ? `<span class="tt-schild"><img src="${escapeHtml(erklaerung.svgUrl)}" alt="Schild" onerror="this.style.display='none'"></span>`
+            : "";
 
-        if (!text) {
-            text = `„${schluessel} = ${wert}" – Eine Information aus der Karte.`;
-        }
+        // Extra-HTML (z.B. Spurdiagramm oder mehrere Schilder) einbauen wenn vorhanden
+        const extraHtml = erklaerung.extraHtml || "";
 
         tooltip.innerHTML = `
-            <span class="tt-emoji">${escapeHtml(emoji)}</span>
+            ${schildHtml}
+            <span class="tt-emoji">${escapeHtml(erklaerung.emoji || "📌")}</span>
             <span class="tt-tag">${escapeHtml(`${schluessel} = ${wert}`)}</span>
-            <span class="tt-text">${formatTextToHtml(text)}</span>
+            <span class="tt-text">${textZuHtml(erklaerung.text || "")}</span>
+            ${extraHtml}
         `;
 
-        tooltip.classList.add("sichtbar");
-        const breite = tooltip.offsetWidth || 340;
-        const hoehe = tooltip.offsetHeight || 160;
+        // Position berechnen — nicht aus dem Fenster fallen
+        const rand    = 20;
+        const breite  = 300;
+        const hoehe   = tooltip.offsetHeight || 160;
 
         let links = x + 12;
-        let oben = y - hoehe - 16;
+        let oben  = y - hoehe - 16;
 
-        if (links + breite > window.innerWidth - 20) links = x - breite - 12;
-        if (oben < 20) oben = y + 16;
-        if (links < 10) links = 10;
+        // Rechts über den Rand?
+        if (links + breite > window.innerWidth - rand) {
+            links = x - breite - 12;
+        }
+        // Oben über den Rand?
+        if (oben < rand) {
+            oben = y + 16;
+        }
 
         tooltip.style.left = `${links}px`;
-        tooltip.style.top = `${oben}px`;
+        tooltip.style.top  = `${oben}px`;
+        tooltip.classList.add("sichtbar");
     }
 
+    // Tooltip verstecken
     function tooltipVerstecken() {
         tooltip.classList.remove("sichtbar");
     }
 
-    function sammleAlleTags(popup) {
-        const tags = {};
-        const listItems = popup.querySelectorAll("li");
+    // ═══════════════════════════════════════════════════════════════
+    // 🔎 POPUP-INHALT ÜBERWACHEN (MutationObserver)
+    // ═══════════════════════════════════════════════════════════════
 
-        listItems.forEach((li) => {
-            const tagText = li.textContent.trim();
-            const gleichPos = tagText.indexOf("=");
-            if (gleichPos === -1) return;
-            const schluessel = tagText.substring(0, gleichPos).trim().toLowerCase();
-            const wert = tagText.substring(gleichPos + 1).trim();
-            if (schluessel && wert) tags[schluessel] = wert;
+    // Tag-Zeilen im Popup mit Hover versehen
+    function leseTagAusLi(li) {
+        if (!li) return null;
+        const tagText = li.textContent.trim();
+        const gleichPos = tagText.indexOf("=");
+        if (gleichPos === -1) return null;
+
+        const schluessel = tagText.substring(0, gleichPos).trim();
+        const wert = tagText.substring(gleichPos + 1).trim();
+        if (!schluessel || !wert) return null;
+        return { schluessel, wert };
+    }
+
+    function leseTagAusTr(tr) {
+        if (!tr) return null;
+        const zellen = tr.querySelectorAll("td");
+        if (zellen.length < 2) return null;
+
+        const schluessel = zellen[0].textContent.trim();
+        const wert = zellen[1].textContent.trim();
+        if (!schluessel || !wert) return null;
+        return { schluessel, wert };
+    }
+
+    function bindeHover(container, tag) {
+        if (!container || !tag || container.dataset.kindererklarung === "1") return;
+        container.dataset.kindererklarung = "1";
+        container.classList.add("osm-tag-zeile");
+
+        container.addEventListener("mouseenter", (e) => {
+            tooltipZeigen(e.clientX, e.clientY, tag.schluessel, tag.wert);
         });
-
-        return tags;
+        container.addEventListener("mousemove", (e) => {
+            tooltipZeigen(e.clientX, e.clientY, tag.schluessel, tag.wert);
+        });
+        container.addEventListener("mouseleave", () => {
+            tooltipVerstecken();
+        });
     }
 
     function tagZeilenAusruesten(popup) {
-        const alleTags = sammleAlleTags(popup);
-        const listItems = popup.querySelectorAll("li");
+        if (!popup) return;
 
-        listItems.forEach((li) => {
-            if (li.dataset.kindererklarung) return;
+        // Bewährter 4.4-Weg: Overpass Turbo liefert Tag-Zeilen häufig als <li>
+        popup.querySelectorAll("li").forEach((li) => {
+            const tag = leseTagAusLi(li);
+            if (tag) bindeHover(li, tag);
+        });
 
-            const tagText = li.textContent.trim();
-            const gleichPos = tagText.indexOf("=");
-            if (gleichPos === -1) return;
+        // Fallback für Tabellenlayouts
+        popup.querySelectorAll("tr").forEach((tr) => {
+            const tag = leseTagAusTr(tr);
+            if (tag) bindeHover(tr, tag);
+        });
 
-            const schluessel = tagText.substring(0, gleichPos).trim().toLowerCase();
-            const wert = tagText.substring(gleichPos + 1).trim();
+        // Zusätzlicher Fallback für getrennte key/value-Spans
+        const keys = popup.querySelectorAll(".tag-key");
+        keys.forEach((keyNode) => {
+            const container = keyNode.closest("li") || keyNode.parentElement;
+            if (!container || container.dataset.kindererklarung === "1") return;
+
+            const valueNode = container.querySelector(".tag-value");
+            if (!valueNode) return;
+
+            const schluessel = keyNode.textContent.trim();
+            const wert = valueNode.textContent.trim();
             if (!schluessel || !wert) return;
 
-            li.dataset.kindererklarung = "1";
-            li.classList.add("osm-tag-zeile");
-
-            li.addEventListener("mouseenter", (e) => tooltipZeigen(e.clientX, e.clientY, schluessel, wert, alleTags));
-            li.addEventListener("mousemove", (e) => tooltipZeigen(e.clientX, e.clientY, schluessel, wert, alleTags));
-            li.addEventListener("mouseleave", () => tooltipVerstecken());
+            bindeHover(container, { schluessel, wert });
         });
     }
 
+    // MutationObserver — überwacht den gesamten Body auf neue Popup-Elemente
     const beobachter = new MutationObserver((mutationen) => {
         mutationen.forEach((mutation) => {
             mutation.addedNodes.forEach((knoten) => {
                 if (knoten.nodeType !== Node.ELEMENT_NODE) return;
-                const popup = knoten.classList?.contains("leaflet-popup-content")
+
+                const popup =
+                    knoten.classList && knoten.classList.contains("leaflet-popup-content")
                     ? knoten
                     : knoten.querySelector?.(".leaflet-popup-content");
+
                 if (popup) {
-                    setTimeout(() => tagZeilenAusruesten(popup), 100);
+                    setTimeout(() => tagZeilenAusruesten(popup), 60);
+                    setTimeout(() => tagZeilenAusruesten(popup), 180);
+                    setTimeout(() => tagZeilenAusruesten(popup), 400);
                 }
             });
         });
     });
 
-    beobachter.observe(document.body, { childList: true, subtree: true });
-
-    document.querySelectorAll(".leaflet-popup-content").forEach((popup) => {
-        setTimeout(() => tagZeilenAusruesten(popup), 100);
+    beobachter.observe(document.body, {
+        childList: true,
+        subtree: true,
     });
 
-    document.addEventListener("click", () => tooltipVerstecken());
+    // Bereits vorhandene Popups verarbeiten (falls schon offen beim Laden)
+    document.querySelectorAll(".leaflet-popup-content").forEach((popup) => {
+        setTimeout(() => tagZeilenAusruesten(popup), 60);
+    });
 
-    console.log(`🧒 OSM Kinder-Erklärer ${VERSION} aktiv!`);
-    console.log("📌 Enthält: Verkehrszeichen, Orte, Natur, Gebäude, Gewässer, Fahrradwege, Oberflächen und vieles mehr!");
+    // Zusätzliche Event-Delegation, falls Overpass Turbo Popup-Zeilen austauscht,
+    // ohne dass unsere direkten Event-Listener erhalten bleiben.
+    function findeTagContainer(start) {
+        if (!start || !(start instanceof Element)) return null;
+        return start.closest('.leaflet-popup-content li, .leaflet-popup-content tr');
+    }
+
+    function leseTagAusContainer(container) {
+        if (!container) return null;
+        if (container.matches('li')) return leseTagAusLi(container);
+        if (container.matches('tr')) return leseTagAusTr(container);
+
+        const keyNode = container.querySelector('.tag-key');
+        const valueNode = container.querySelector('.tag-value');
+        if (keyNode && valueNode) {
+            const schluessel = keyNode.textContent.trim();
+            const wert = valueNode.textContent.trim();
+            if (schluessel && wert) return { schluessel, wert };
+        }
+        return null;
+    }
+
+    let letzterHoverContainer = null;
+
+    document.addEventListener('mouseover', (e) => {
+        const container = findeTagContainer(e.target);
+        if (!container) return;
+
+        const popup = container.closest('.leaflet-popup-content');
+        if (popup) tagZeilenAusruesten(popup);
+
+        const tag = leseTagAusContainer(container);
+        if (!tag) return;
+
+        letzterHoverContainer = container;
+        container.classList.add('osm-tag-zeile');
+        tooltipZeigen(e.clientX, e.clientY, tag.schluessel, tag.wert);
+    }, true);
+
+    document.addEventListener('mousemove', (e) => {
+        if (!letzterHoverContainer) return;
+        const aktuell = findeTagContainer(e.target);
+        if (!aktuell || aktuell !== letzterHoverContainer) return;
+
+        const tag = leseTagAusContainer(letzterHoverContainer);
+        if (!tag) return;
+        tooltipZeigen(e.clientX, e.clientY, tag.schluessel, tag.wert);
+    }, true);
+
+    document.addEventListener('mouseout', (e) => {
+        if (!letzterHoverContainer) return;
+        const ziel = e.relatedTarget;
+        if (ziel instanceof Element && letzterHoverContainer.contains(ziel)) return;
+
+        const verlassenVon = findeTagContainer(e.target);
+        if (verlassenVon && verlassenVon === letzterHoverContainer) {
+            letzterHoverContainer = null;
+            tooltipVerstecken();
+        }
+    }, true);
+
+    // Tooltip schließen wenn woanders geklickt wird
+    document.addEventListener("click", () => {
+        letzterHoverContainer = null;
+        tooltipVerstecken();
+    });
+
+    console.log(`🧒 OSM Kinder-Erklärer v${VERSION} aktiv! Hover über Tag-Zeilen im Popup für Erklärungen.`);
+
 })();
