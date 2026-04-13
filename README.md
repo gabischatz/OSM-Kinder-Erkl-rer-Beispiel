@@ -13,7 +13,7 @@ Diese Version ist für die Chrome-Erweiterung **User JavaScript and CSS** vorber
 
 ## Beispiel
 
-![OSM Kinder-Erklärer Beispiel](images/osm-kinder-erklaerer-beispiel.png)
+![OSM Kinder-Erklärer Beispiel](osm-kinder-erklaerer-beispiel.png)
 
 Beim Klick auf einen Weg in Overpass Turbo werden die Tags angezeigt.  
 Wenn du anschließend mit der Maus auf einen einzelnen Tag gehst, blendet das Skript eine **kindgerechte Erklärung** ein.
