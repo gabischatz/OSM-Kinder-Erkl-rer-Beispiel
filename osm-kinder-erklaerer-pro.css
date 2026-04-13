@@ -1,0 +1,75 @@
+#osm-kinder-tooltip {
+    position: fixed;
+    z-index: 100000;
+    max-width: 340px;
+    padding: 12px 16px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #fff9e6 0%, #ffefc0 100%);
+    border: 3px solid #ffcc00;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+    font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #333;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    opacity: 0;
+}
+
+#osm-kinder-tooltip.sichtbar {
+    opacity: 1;
+}
+
+#osm-kinder-tooltip .tt-emoji {
+    font-size: 36px;
+    text-align: center;
+    display: block;
+    margin-bottom: 8px;
+}
+
+#osm-kinder-tooltip .tt-tag {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: block;
+    text-align: center;
+    word-break: break-word;
+}
+
+#osm-kinder-tooltip .tt-text {
+    font-size: 14px;
+    color: #444;
+    white-space: normal;
+    text-align: left;
+}
+
+#osm-kinder-tooltip .tt-text strong {
+    color: #d48c00;
+}
+
+#osm-kinder-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    left: 20px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 12px solid #ffcc00;
+}
+
+.osm-tag-zeile {
+    cursor: help;
+    border-radius: 6px;
+    transition: background 0.15s;
+    padding: 4px 8px;
+    margin: 2px 0;
+    display: inline-block;
+    list-style: none;
+}
+
+.osm-tag-zeile:hover {
+    background: rgba(255, 204, 0, 0.3) !important;
+}
